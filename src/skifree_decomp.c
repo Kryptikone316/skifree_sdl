@@ -107,6 +107,7 @@ int main(int argc, char* argv[]) {
     /* test hook: force the yeti start distance (metres) whatever the setting, to test "never" at a short course */
     if (getenv("SKI_TEST_YETI_M")) yetiStartY = (short)(atoi(getenv("SKI_TEST_YETI_M")) * 16);
     sfsnd_prepare();
+    if (g_cfg.look == 2) peres_use_pack("sprites16");
     fprintf(stderr, "settings: sound %d vol %d custom %d screen %d fps %d timing %d yeti %d speed %d\n", g_cfg.sound,
             g_cfg.volume, g_cfg.custom, g_cfg.mode, g_cfg.fps, g_cfg.timing, g_cfg.yeti, g_cfg.speed);
 #endif
@@ -958,6 +959,9 @@ void mainWindowPaint(HWND param_1) {
     r.bottom = windowClientRect.bottom;
 
     SDL_RenderClear(renderer);
+#ifdef SF3500
+    sf3500_draw_ground(-(int)playerX, -(int)playerY);
+#endif
 
     paintActors(NULL, &r);
 

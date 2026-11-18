@@ -147,10 +147,54 @@ int peres_open(const char* path) {
     return 0;
 }
 
+static embedded_resource_t g_pack[90];   /* indexed by sprite id; content NULL = not replaced */
+
+static int bmp_dims(const unsigned char* b, int len, int* w, int* h) {
+    if (len < 26 || b[0] != 'B' || b[1] != 'M') return -1;
+    *w = (int)(b[18] | (b[19] << 8) | (b[20] << 16) | (b[21] << 24));
+    *h = (int)(b[22] | (b[23] << 8) | (b[24] << 16) | (b[25] << 24));
+    if (*h < 0) *h = -*h;
+    return 0;
+}
+
+int peres_use_pack(const char* dir) {
+    int id, used = 0;
+    for (id = 1; id < 90; id++) {
+        char path[256], key[64];
+        FILE* f;
+        long size;
+        unsigned char* buf;
+        embedded_resource_t* orig;
+        int w1, h1, w2, h2;
+        snprintf(path, sizeof path, "%s/ski32_%d.bmp", dir, id);
+        f = fopen(path, "rb");
+        if (!f) continue;
+        fseek(f, 0, SEEK_END); size = ftell(f); fseek(f, 0, SEEK_SET);
+        buf = (size > 26 && size < 1024 * 1024) ? (unsigned char*)malloc((size_t)size) : NULL;
+        if (!buf || fread(buf, 1, (size_t)size, f) != (size_t)size) { free(buf); fclose(f); continue; }
+        fclose(f);
+        snprintf(key, sizeof key, "resources/ski32_%d.bmp", id);
+        orig = get_embedded_resource_by_name(key);
+        if (!orig || bmp_dims((const unsigned char*)orig->content, orig->len, &w1, &h1) != 0 ||
+            bmp_dims(buf, (int)size, &w2, &h2) != 0 || w1 != w2 || h1 != h2) {
+            fprintf(stderr, "sprites: %s skipped (size differs from the exe's sprite)\n", path);
+            free(buf);
+            continue;
+        }
+        g_pack[id].name = "pack";
+        g_pack[id].len = (int)size;
+        g_pack[id].content = (const char*)buf;
+        used++;
+    }
+    fprintf(stderr, "sprites: %d replaced from %s\n", used, dir);
+    return used;
+}
+
 embedded_resource_t* get_embedded_resource_by_name(char* name) {
     static embedded_resource_t fon = { "resources/vgaoem.fon", 0, "" };
-    int i;
+    int i, id;
     if (strcmp(name, fon.name) == 0) return &fon;
+    if (sscanf(name, "resources/ski32_%d.bmp", &id) == 1 && id > 0 && id < 90 && g_pack[id].content) return &g_pack[id];
     for (i = 0; i < g_count; i++)
         if (strcmp(name, g_res[i].name) == 0) return &g_res[i];
     return NULL;

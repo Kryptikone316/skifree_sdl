@@ -26,6 +26,7 @@ void sf3500_mode_info(int mode, int* vw, int* vh, int* scale, int* ww, int* wh);
 SDL_Renderer* sf3500_make_renderer(void);     /* software renderer on the 640x480 surface */
 void sf3500_output_size(int* w, int* h);      /* playfield size in game pixels */
 void sf3500_present(void);                    /* send the frame, cap the frame rate */
+void sf3500_draw_ground(int scroll_x, int scroll_y);   /* 16-bit theme: snow texture under the sprites */
 unsigned sf3500_buttons(void);
 void sf3500_quit(int code);                   /* release display, exit */
 void sf3500_error_screen(const char* line1, const char* line2);

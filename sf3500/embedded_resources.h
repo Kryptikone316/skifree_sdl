@@ -17,6 +17,11 @@ int peres_open(const char* exe_path);
 const char* peres_error(void);
 int peres_bitmap_count(void);
 
+/* Optional replacement sprites: <dir>/ski32_<id>.bmp. A file is used only when its width and height
+ * equal the exe's sprite (the sizes drive the game's collisions); the rest stay as they are.
+ * Returns the number of sprites replaced. */
+int peres_use_pack(const char* dir);
+
 /* Returns NULL when the resource does not exist. "resources/vgaoem.fon" is
  * answered with a dummy entry: the font shim does not read it. */
 embedded_resource_t* get_embedded_resource_by_name(char* name);
