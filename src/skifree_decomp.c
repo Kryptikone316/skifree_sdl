@@ -12,6 +12,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef SF3500
+#include "../sf3500/input.inc"
+#endif
+
 #define ski_assert(exp, line) (void)((exp) || (assertFailed(sourceFilename, line), 0)) // TODO remove need for src param.
 
 // Velocities in the decomp are pixels per 40 ms update. Keep that unit, but
@@ -52,10 +56,30 @@ int main(int argc, char* argv[]) {
         }
     }
 
+#ifdef SF3500
+    /* No real SDL video device on this hardware: SDL's dummy driver only provides the
+     * window object, the frames go to the device driver (sf3500_present). */
+    SDL_setenv("SDL_VIDEODRIVER", "dummy", 0);
+    SDL_setenv("SDL_AUDIODRIVER", "dummy", 0);
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    setvbuf(stderr, NULL, _IOLBF, 0);
+#endif
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
         printf("failed to init\n");
         return 1;
     }
+#ifdef SF3500
+    if (sf3500_start() != 0) return 1;
+    {
+        const char* exe = getenv("SKI_EXE");
+        if (peres_open(exe ? exe : "ski32.exe") != 0) {
+            fprintf(stderr, "ski32.exe: %s\n", peres_error());
+            sf3500_error_screen("ski32.exe is missing or not version 1.04", peres_error());
+            sf3500_quit(2);
+        }
+        fprintf(stderr, "ski32.exe: %d bitmaps loaded\n", peres_bitmap_count());
+    }
+#endif
 
     TTF_Init();
 
@@ -95,6 +119,9 @@ int main(int argc, char* argv[]) {
 
     int is_running = 1;
     while (is_running) {
+#ifdef SF3500
+        sfPollInput();
+#endif
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
             case SDL_QUIT:
@@ -511,13 +538,17 @@ int initWindows() {
         nWidth, nHeight,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 
+#ifdef SF3500
+    renderer = sf3500_make_renderer();
+#else
     renderer = SDL_CreateRenderer(hSkiMainWnd, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (renderer == NULL) {
         fprintf(stderr, "Could not create a vsynced renderer: %s\n", SDL_GetError());
         renderer = SDL_CreateRenderer(hSkiMainWnd, -1, SDL_RENDERER_ACCELERATED);
     }
+#endif
     if (renderer == NULL) {
-        fprintf(stderr, "Could not create an accelerated renderer: %s\n", SDL_GetError());
+        fprintf(stderr, "Could not create a renderer: %s\n", SDL_GetError());
         return 0;
     }
 
@@ -892,7 +923,11 @@ void mainWindowPaint(HWND param_1) {
     dstrect.h = statusWindowHeight;
     SDL_RenderCopy(renderer, statusWindowTexture, NULL, &dstrect);
 
+#ifdef SF3500
+    sf3500_present();
+#else
     SDL_RenderPresent(renderer);
+#endif
 }
 
 void paintActors(HDC hdc, RECT* paintRect) {
@@ -3018,7 +3053,11 @@ void updateWindowSize(HWND hWnd) {
     DAT_0040c760 = 0;
     int w, h;
 
+#ifdef SF3500
+    sf3500_output_size(&w, &h);
+#else
     SDL_GetRendererOutputSize(renderer, &w, &h);
+#endif
     windowClientRect.right = w;
     windowClientRect.bottom = h;
 
