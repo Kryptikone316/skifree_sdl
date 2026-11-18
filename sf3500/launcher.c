@@ -39,7 +39,7 @@ typedef struct {
     const char* help;
 } Item;
 
-enum { A_PLAY = 1, A_AV, A_GAME, A_EXIT, A_BACK, A_RESET_AV, A_RESET_GAME };
+enum { A_PLAY = 1, A_AV, A_GAME, A_EXIT, A_BACK, A_RESET_AV, A_RESET_GAME, A_HOW };
 
 static const Opt o_onoff[] = { { 1, "On" }, { 0, "Off" } };
 static const Opt o_volume[] = { { 0, "Mute" }, { 1, "1 of 10" }, { 2, "2 of 10" }, { 3, "3 of 10" }, { 4, "4 of 10" },
@@ -62,6 +62,7 @@ static char g_help_screen[200];
 
 static const Item main_items[] = {
     { K_ACTION, "Play Game", 0, 0, 0, A_PLAY, "Start skiing with the settings below." },
+    { K_ACTION, "How To Play", 0, 0, 0, A_HOW, "How SkiFree works and what the buttons do." },
     { K_ACTION, "Audio / Video", 0, 0, 0, A_AV, "Sounds, volume, screen size and frame rate." },
     { K_ACTION, "Gameplay", 0, 0, 0, A_GAME, "Frame timing, yeti and game speed." },
     { K_ACTION, "Exit", 0, 0, 0, A_EXIT, "Leave SkiFree and go back to the menu." },
@@ -186,7 +187,7 @@ static void button(int x, int y, int w, int h, const char* label, int selected) 
     text(tx, ty, 2, selected ? COL_YELLOW : COL_BLACK, label);
 }
 
-static void wrap_text(int x, int y, int cols, int maxlines, unsigned short c, const char* s) {
+static int wrap_text(int x, int y, int cols, int maxlines, unsigned short c, const char* s) {
     char line[80];
     int lines = 0;
     if (cols > 78) cols = 78;
@@ -204,6 +205,7 @@ static void wrap_text(int x, int y, int cols, int maxlines, unsigned short c, co
         while (*s == ' ') s++;
         lines++;
     }
+    return lines;
 }
 
 /* tiny picture of the screen with the game's window in it */
@@ -228,7 +230,7 @@ static void hint(void) {
 static void draw_main(int sel, const Item* items, int n) {
     int i;
     background();
-    for (i = 0; i < n; i++) button(220, 148 + i * 56, 280, 44, items[i].name, i == sel);
+    for (i = 0; i < n; i++) button(220, 144 + i * 48, 280, 40, items[i].name, i == sel);
     hint();
 }
 
@@ -289,6 +291,79 @@ static unsigned poll_pressed(void) {
     g_prev = b;
     if ((b & SB_START) && (b & SB_SELECT)) return 0x80000000u;   /* leave */
     return pressed;
+}
+
+/* ---- how to play ---- */
+
+#define HOW_PAGES 2
+#define HOW_X 116
+#define HOW_W 446
+#define HOW_Y 134
+#define HOW_H 228
+
+static const char* const k_controls[][2] = {
+    { "LEFT/RIGHT", "turn" },
+    { "DOWN", "straight downhill" },
+    { "UP", "shuffle uphill when stopped" },
+    { "Y / A", "steer down-left / down-right" },
+    { "L2 / R2", "face across the slope" },
+    { "B or R1", "jump; again in the air = tricks" },
+    { "X", "small hop" },
+    { "L1", "speed boost on / off (2x)" },
+    { "SELECT", "pause" },
+    { "START", "new game" },
+    { "SELECT+START", "back to this menu" },
+};
+
+static void draw_howto(int page) {
+    int x = HOW_X, y = HOW_Y, w = HOW_W, ty, i;
+    char pg[16];
+    background();
+    fill(x + 5, y + 5, w, HOW_H, COL_DROP);
+    box3d(x, y, w, HOW_H, 0, COL_GRAY);
+    fill(x + 3, y + 3, w - 6, 22, COL_NAVY);
+    text(x + 10, y + 6, 2, COL_WHITE, "How To Play");
+    snprintf(pg, sizeof pg, "%d/%d", page + 1, HOW_PAGES);
+    text(x + w - 10 - twidth(2, pg), y + 6, 2, COL_YELLOW, pg);
+    box3d(x + 8, y + 31, w - 16, HOW_H - 31 - 8, 1, COL_WHITE);
+    ty = y + 38;
+    if (page == 0) {
+        int cols = (w - 16 - 16) / 8;
+        ty += 12 * wrap_text(x + 16, ty, cols, 3, COL_BLACK, "Ski down the mountain and stay on your feet. Trees and rocks knock you over.") + 4;
+        ty += 12 * wrap_text(x + 16, ty, cols, 2, COL_BLACK, "Jump off bumps and ramps, and do tricks in the air for style points.") + 6;
+        text(x + 16, ty, 1, COL_NAVY, "Pick a course by skiing through a sign at the start:");
+        ty += 14;
+        ty += 12 * wrap_text(x + 24, ty, cols - 2, 2, COL_BLACK, "Slalom: a timed race through the gates. A missed gate adds 5 seconds.");
+        ty += 12 * wrap_text(x + 24, ty, cols - 2, 2, COL_BLACK, "Tree Slalom: a longer timed race.");
+        ty += 12 * wrap_text(x + 24, ty, cols - 2, 2, COL_BLACK, "Freestyle: no finish line. Score style points with jumps and tricks.") + 6;
+        ty += 12 * wrap_text(x + 16, ty, cols, 3, COL_BLACK, "After 2000 m the yeti comes after you. If he catches you, press B to start again.");
+    } else {
+        for (i = 0; i < (int)(sizeof k_controls / sizeof k_controls[0]); i++, ty += 15) {
+            text(x + 16, ty, 1, COL_NAVY, k_controls[i][0]);
+            text(x + 120, ty, 1, COL_BLACK, k_controls[i][1]);
+        }
+        wrap_text(x + 16, ty + 3, (w - 32) / 8, 2, COL_DGRAY, "You get back up on your own after a fall.");
+    }
+    {
+        const char* h = "LEFT/RIGHT page    B back";
+        text(SF_W / 2 + 8 - twidth(1, h) / 2, 452, 1, COL_HINT, h);
+    }
+}
+
+/* Returns A_BACK, or A_EXIT for SELECT+START. */
+static int show_howto(void) {
+    int page = 0, dirty = 1;
+    for (;;) {
+        unsigned p;
+        if (dirty) { draw_howto(page); dirty = 0; }
+        sf3500_present();
+        p = poll_pressed();
+        if (p) dirty = 1;
+        if (p & 0x80000000u) return A_EXIT;
+        if (p & (SB_RIGHT | SB_A)) page = (page + 1) % HOW_PAGES;
+        if (p & SB_LEFT) page = (page + HOW_PAGES - 1) % HOW_PAGES;
+        if (p & SB_B) return A_BACK;
+    }
 }
 
 static void restore(int which) {
@@ -375,6 +450,7 @@ int launcher_run(const char* cfg_path) {
         int sub = 0, a = run_menu("", (Item*)main_items, N(main_items), 1, &msel);
         if (a == A_PLAY) { result = 1; break; }
         if (a == A_EXIT) { result = 0; break; }
+        if (a == A_HOW) { if (show_howto() == A_EXIT) { result = 0; goto done; } }
         if (a == A_AV) { if (run_menu("Audio / Video", av_items, N(av_items), 0, &sub) == A_EXIT) { result = 0; goto done; } }
         if (a == A_GAME) { if (run_menu("Gameplay", game_items, N(game_items), 0, &sub) == A_EXIT) { result = 0; goto done; } }
     }
