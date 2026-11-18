@@ -12,7 +12,7 @@ void cfg_defaults(void) {
     g_cfg.custom = 1;
     g_cfg.mode = 0;
     g_cfg.fps = 40;
-    g_cfg.timing = 0;
+    g_cfg.timing = 1;
     g_cfg.yeti = 2000;
     g_cfg.speed = 100;
     g_cfg.nice = -10;
