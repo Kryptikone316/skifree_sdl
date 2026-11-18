@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 
 static SDL_Surface* g_surf;
 static SDL_Renderer* g_ren;
@@ -33,6 +34,11 @@ int sf3500_start(void) {
     g_maxframes = env_int("SKI_MAXFRAMES", 0);
     s = getenv("SKI_JOY");
     if (s) snprintf(g_script, sizeof(g_script), "%s", s);
+
+    /* the card's background scripts wake up often; a better priority keeps frames even
+     * (Water Closet: late frames 14-19 per 2 s -> 0 with nice -10) */
+    s = getenv("SKI_NICE");
+    if (s && *s) setpriority(PRIO_PROCESS, 0, atoi(s));
 
     if (!g_headless) {
         if (hwdisp_init() != 0) {
