@@ -133,8 +133,10 @@ void sf3500_draw_ground(int scroll_x, int scroll_y) {
     sf3500_mode_info(g_cfg.mode, &vw, &vh, &sc, &ww, &wh);
     ox = ((scroll_x % SNOW_TILE) + SNOW_TILE) % SNOW_TILE;
     oy = ((scroll_y % SNOW_TILE) + SNOW_TILE) % SNOW_TILE;
-    for (y = -oy; y < vh; y += SNOW_TILE)
-        for (x = -ox; x < vw; x += SNOW_TILE) {
+    /* the world moves opposite to the skier: scroll_* is minus the skier's position, so the tiles start one
+     * tile back from +offset (starting at -offset made the ground slide against the trees) */
+    for (y = oy - SNOW_TILE; y < vh; y += SNOW_TILE)
+        for (x = ox - SNOW_TILE; x < vw; x += SNOW_TILE) {
             SDL_Rect d;
             d.x = x; d.y = y; d.w = SNOW_TILE; d.h = SNOW_TILE;
             SDL_RenderCopy(g_ren, g_snow, NULL, &d);
