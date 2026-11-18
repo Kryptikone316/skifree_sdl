@@ -53,9 +53,9 @@ static void sfPollInput(void) {
     /* test hook: SKI_TRACE=<n> prints the game state every n frames */
     if (traceOn < 0) traceOn = getenv("SKI_TRACE") ? atoi(getenv("SKI_TRACE")) : 0;
     if (traceOn > 0 && ++polls % (unsigned)traceOn == 0)
-        fprintf(stderr, "trace f=%u player=%s frame=%d dist=%d x=%d running=%d paused=%d turbo=%d\n", polls,
+        fprintf(stderr, "trace f=%u player=%s frame=%d dist=%d x=%d running=%d paused=%d turbo=%d modes=%d%d%d t=%d ax=%d ay=%d\n", polls,
                 playerActor ? "alive" : "none", playerActor ? (int)playerActor->frameNo : -1, (int)playerY,
-                (int)playerX, (int)isGameTimerRunning, (int)isPaused, (int)isTurboMode);
+                (int)playerX, (int)isGameTimerRunning, (int)isPaused, (int)isTurboMode, (int)isSsGameMode, (int)isFsGameMode, (int)isGsGameMode, (int)elapsedTime, playerActor ? (int)playerActor->xPosMaybe : 0, playerActor ? (int)playerActor->yPosMaybe : 0);
 
     for (i = 0; i < sizeof(sfKeys) / sizeof(sfKeys[0]); i++) {
         const SfKey* k = &sfKeys[i];

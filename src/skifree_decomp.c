@@ -3678,7 +3678,21 @@ static void updateMovementOnly(void) {
     for (actor = actorListPtr; actor != NULL; actor = nextActor) {
         nextActor = actor->next;
         if ((actor->flags & (FLAG_2 | FLAG_8)) == 0 && actor->permObject == NULL && actorUsesVelocityMovement(actor)) {
-            updateActorPositionWithVelocityMaybe(actor);
+            if (actor == playerActor) {
+                /* The slalom / freestyle / tree slalom courses start when the skier crosses a line
+                 * (y = 640), judged from the position before and after a move. In between the 40 ms
+                 * logic ticks the skier is moved here, so the crossing can happen in this step and the
+                 * logic tick then never sees it (the clock stayed at 0). Run the course checks for
+                 * every step. */
+                short oldX = actor->xPosMaybe;
+                short oldY = actor->yPosMaybe;
+                Actor* moved = updateActorPositionWithVelocityMaybe(actor);
+                updateSsGameMode(moved, oldX, oldY);
+                updateFsGameMode(moved, oldX, oldY);
+                updateGsGameMode(moved, oldX, oldY);
+            } else {
+                updateActorPositionWithVelocityMaybe(actor);
+            }
         }
     }
 
