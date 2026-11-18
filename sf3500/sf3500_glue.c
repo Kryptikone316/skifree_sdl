@@ -101,46 +101,60 @@ void sf3500_set_fps(int fps) {
     g_fps = fps < 5 ? 5 : (fps > 120 ? 120 : fps);
 }
 
-/* 16-bit theme: a tiling snow texture (soft blue-white with a few drifts of darker flecks), drawn under the
- * sprites and scrolled with the skier so it reads as ground. */
+/* 16-bit theme: a tiling snow texture (soft blue-white with a few drifts of darker flecks) under the sprites,
+ * scrolled with the skier so it reads as ground. The tile is kept in the screen's own RGB565 format and
+ * copied row by row straight into the view: it replaces the game's per-frame clear instead of adding to it
+ * (drawing it as SDL textures cost ~30x the Windows theme's frame time). */
 #define SNOW_TILE 128
-static SDL_Texture* g_snow;
+static unsigned short* g_tile;     /* g_tile_n x g_tile_n, RGB565, each logical pixel repeated scale x scale */
+static int g_tile_n;
+
 static unsigned snow_hash(unsigned x, unsigned y) {
     unsigned h = x * 374761393u + y * 668265263u;
     h = (h ^ (h >> 13)) * 1274126177u;
     return h ^ (h >> 16);
 }
-static void make_snow(void) {
-    SDL_Surface* s = SDL_CreateRGBSurfaceWithFormat(0, SNOW_TILE, SNOW_TILE, 32, SDL_PIXELFORMAT_ABGR8888);
-    int x, y;
-    if (!s || !g_ren) return;
+
+static void make_snow(int scale) {
+    int x, y, i, j;
+    free(g_tile);
+    g_tile_n = SNOW_TILE * scale;
+    g_tile = (unsigned short*)malloc((size_t)g_tile_n * g_tile_n * sizeof(unsigned short));
+    if (!g_tile) return;
     for (y = 0; y < SNOW_TILE; y++)
         for (x = 0; x < SNOW_TILE; x++) {
             unsigned h = snow_hash((unsigned)x, (unsigned)y);
             int r = 240, g = 246, b = 254;                       /* base: snow with a blue tint */
+            unsigned short c;
             if (h % 61 == 0) { r = 214; g = 226; b = 248; }      /* small shadow flecks */
             else if (h % 97 == 0) { r = 252; g = 254; b = 255; } /* glints (never pure white: that is the sprites' key) */
             else if ((x / 2 + y / 2) % 2 && snow_hash((unsigned)(x / 8), (unsigned)(y / 8)) % 5 == 0) { r = 232; g = 240; b = 252; } /* faint dithered patches */
-            ((unsigned*)((unsigned char*)s->pixels + y * s->pitch))[x] = 0xFF000000u | ((unsigned)b << 16) | ((unsigned)g << 8) | (unsigned)r;
+            c = (unsigned short)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+            for (j = 0; j < scale; j++)
+                for (i = 0; i < scale; i++) g_tile[(y * scale + j) * g_tile_n + x * scale + i] = c;
         }
-    g_snow = SDL_CreateTextureFromSurface(g_ren, s);
-    SDL_FreeSurface(s);
 }
 
-void sf3500_draw_ground(int scroll_x, int scroll_y) {
-    int vw, vh, sc, ww, wh, ox, oy, x, y;
-    if (g_cfg.look != 2 || !g_snow) return;
+/* Paints the whole view with the ground. Returns 0 when the theme is off (the caller clears as usual). */
+int sf3500_draw_ground(int scroll_x, int scroll_y) {
+    int vw, vh, sc, ww, wh, ox, oy, y;
+    if (g_cfg.look != 2 || !g_tile || !g_view) return 0;
     sf3500_mode_info(g_cfg.mode, &vw, &vh, &sc, &ww, &wh);
-    ox = ((scroll_x % SNOW_TILE) + SNOW_TILE) % SNOW_TILE;
-    oy = ((scroll_y % SNOW_TILE) + SNOW_TILE) % SNOW_TILE;
-    /* the world moves opposite to the skier: scroll_* is minus the skier's position, so the tiles start one
-     * tile back from +offset (starting at -offset made the ground slide against the trees) */
-    for (y = oy - SNOW_TILE; y < vh; y += SNOW_TILE)
-        for (x = ox - SNOW_TILE; x < vw; x += SNOW_TILE) {
-            SDL_Rect d;
-            d.x = x; d.y = y; d.w = SNOW_TILE; d.h = SNOW_TILE;
-            SDL_RenderCopy(g_ren, g_snow, NULL, &d);
+    /* the world moves opposite to the skier: tile pixel (x - ox, y - oy) lands on screen pixel (x, y) */
+    ox = (((scroll_x % SNOW_TILE) + SNOW_TILE) % SNOW_TILE) * sc;
+    oy = (((scroll_y % SNOW_TILE) + SNOW_TILE) % SNOW_TILE) * sc;
+    for (y = 0; y < wh; y++) {
+        unsigned short* dst = (unsigned short*)((unsigned char*)g_view->pixels + y * g_view->pitch);
+        const unsigned short* row = g_tile + (size_t)((((y - oy) % g_tile_n) + g_tile_n) % g_tile_n) * g_tile_n;
+        int sx = (g_tile_n - ox) % g_tile_n, left = ww;
+        while (left > 0) {
+            int n = g_tile_n - sx;
+            if (n > left) n = left;
+            memcpy(dst, row + sx, (size_t)n * sizeof(unsigned short));
+            dst += n; left -= n; sx = 0;
         }
+    }
+    return 1;
 }
 
 /* Software renderer on the game's window inside the screen, picked by g_cfg.mode. */
@@ -158,7 +172,7 @@ SDL_Renderer* sf3500_make_renderer(void) {
     if (!g_view) return NULL;
     g_ren = SDL_CreateSoftwareRenderer(g_view);
     if (g_ren && scale > 1) SDL_RenderSetLogicalSize(g_ren, vw, vh);
-    if (g_cfg.look == 2) make_snow();
+    if (g_cfg.look == 2) make_snow(scale);
     fprintf(stderr, "sf3500: screen mode %d: view %dx%d, scale %d, window %dx%d at %d,%d\n", g_cfg.mode, vw, vh, scale, ww, wh, x0, y0);
     return g_ren;
 }

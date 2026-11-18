@@ -958,9 +958,10 @@ void mainWindowPaint(HWND param_1) {
     r.top = 0;
     r.bottom = windowClientRect.bottom;
 
-    SDL_RenderClear(renderer);
 #ifdef SF3500
-    sf3500_draw_ground(-(int)playerX, -(int)playerY);
+    if (!sf3500_draw_ground(-(int)playerX, -(int)playerY)) SDL_RenderClear(renderer);   /* the ground replaces the clear */
+#else
+    SDL_RenderClear(renderer);
 #endif
 
     paintActors(NULL, &r);
