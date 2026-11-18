@@ -115,7 +115,8 @@ int cfg_save(const char* path) {
         "yeti=%d\n"
         "# speed: game speed in percent (100 = original)\n"
         "speed=%d\n"
-        "# look: 0 = original colours, 1 = TI-92 calculator look (colours only, the game is unchanged)\n"
+        "# look: the theme, switched with L1/R1 in the launcher menu. 0 = Windows 3.x menus and the original colours,\n"
+        "#        1 = TI-92 calculator menus and game (four LCD grays, colours only, the game is unchanged)\n"
         "look=%d\n"
         "# nice: process priority, -10 keeps the frames even\n"
         "nice=%d\n",

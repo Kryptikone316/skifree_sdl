@@ -52,7 +52,6 @@ static const Opt o_fps[] = { { 20, "20 fps" }, { 30, "30 fps" }, { 40, "40 fps" 
 static const Opt o_timing[] = { { 0, "Smooth" }, { 1, "Original" } };
 static const Opt o_yeti[] = { { 0, "Never" }, { 250, "250 m" }, { 500, "500 m" },
                               { 1000, "1000 m" }, { 2000, "2000 m (orig)" } };
-static const Opt o_look[] = { { 0, "Original" }, { 1, "TI-92" } };
 static const Opt o_speed[] = { { 50, "50%" }, { 75, "75%" }, { 100, "100% (orig)" }, { 125, "125%" }, { 150, "150%" } };
 
 #define N(a) ((int)(sizeof(a) / sizeof((a)[0])))
@@ -84,8 +83,6 @@ static Item game_items[] = {
       "How far you ski before the yeti shows up. Never = practice mode, no yeti at all." },
     { K_CHOICE, "Game speed", &g_cfg.speed, o_speed, N(o_speed), 0,
       "Slow the whole game down to practise, or speed it up." },
-    { K_CHOICE, "Look", &g_cfg.look, o_look, N(o_look), 0,
-      "TI-92 shows the game in the four grays of the calculator version. Looks only, the game is unchanged." },
     { K_ACTION, "Restore defaults", 0, 0, 0, A_RESET_GAME, "Put the gameplay settings back." },
 };
 
@@ -218,8 +215,98 @@ static void preview(int x, int y, int mode) {
 }
 
 static void hint(void) {
-    const char* h = "UP/DOWN choose   LEFT/RIGHT change   A select   B back";
+    const char* h = "UP/DOWN choose  LEFT/RIGHT change  A select  B back  L1/R1 theme";
     text(SF_W / 2 + 8 - twidth(1, h) / 2, 452, 1, COL_HINT, h);
+}
+
+/* ---- TI-92 theme: the calculator's LCD, four grays, a tab toolbar on top, a status line below ---- */
+
+#define TI0 C(190, 204, 180)
+#define TI1 C(146, 164, 140)
+#define TI2 C(84, 102, 92)
+#define TI3 C(26, 36, 38)
+
+static const char* const k_tabs[5] = { "Play", "Help", "A / V", "Game", "Exit" };
+
+static void ti_outline(int x, int y, int w, int h, unsigned short c) {
+    fill(x, y, w, 2, c); fill(x, y + h - 2, w, 2, c);
+    fill(x, y, 2, h, c); fill(x + w - 2, y, 2, h, c);
+}
+
+/* active: the tab the body belongs to (-1 none); cursor: tab shown inverted (-1 none) */
+static void ti_frame(int active, int cursor) {
+    int i;
+    fill(0, 0, SF_W, SF_H, TI3);                 /* bezel */
+    fill(8, 8, SF_W - 16, SF_H - 16, TI0);       /* LCD */
+    ti_outline(14, 44, SF_W - 28, 372, TI3);     /* body */
+    for (i = 0; i < 5; i++) {
+        int x = 14 + i * 124, y = 12, w = 116, h = 34;
+        unsigned short face = (i == cursor) ? TI3 : (i == active ? TI0 : TI1);
+        fill(x, y, w, h, face);
+        fill(x, y, w, 2, TI3); fill(x, y, 2, h, TI3); fill(x + w - 2, y, 2, h, TI3);
+        fill(x, y, 4, 4, TI0); fill(x + w - 4, y, 4, 4, TI0);          /* cut corners */
+        fill(x + 2, y + 2, 2, 2, TI3); fill(x + w - 4, y + 2, 2, 2, TI3);
+        if (i == active) fill(x + 2, 44, w - 4, 2, TI0);                /* tab opens into the body */
+        text(x + (w - twidth(2, k_tabs[i])) / 2, y + 11, 2, i == cursor ? TI0 : TI3, k_tabs[i]);
+    }
+    ti_outline(14, 424, 476, 44, TI3);           /* status line: help */
+    ti_outline(494, 424, SF_W - 14 - 494, 44, TI3);
+    text(502, 431, 1, TI3, "THEME");
+    text(502, 442, 1, TI3, "TI-92");
+    text(502, 453, 1, TI2, "L1/R1");
+}
+
+static void ti_hint(void) {
+    const char* h = "UP/DOWN choose  LEFT/RIGHT change  A select  B back";
+    text(SF_W / 2 - twidth(1, h) / 2, 398, 1, TI2, h);
+}
+
+static void draw_main_ti(int sel, const Item* items, int n) {
+    int i;
+    const char* t = "SkiFree";
+    ti_frame(-1, sel);
+    text(SF_W / 2 - twidth(6, t) / 2 + 3, 63, 6, TI1, t);
+    text(SF_W / 2 - twidth(6, t) / 2, 60, 6, TI3, t);
+    fill(60, 118, SF_W - 120, 2, TI3);
+    text(SF_W / 2 - twidth(1, "by Chris Pirih") / 2, 126, 1, TI2, "by Chris Pirih");
+    for (i = 0; i < n; i++) {
+        int y = 148 + i * 34;
+        if (i == sel) fill(150, y - 4, SF_W - 300, 30, TI3);
+        text(SF_W / 2 - twidth(2, items[i].name) / 2, y + 2, 2, i == sel ? TI0 : TI3, items[i].name);
+    }
+    ti_hint();
+    wrap_text(22, 431, 57, 3, TI3, items[sel].help);
+}
+
+static void draw_sub_ti(const char* title, const Item* items, int n, int sel) {
+    int i, y = 60, pv;
+    char buf[48];
+    ti_frame(!strcmp(title, "Gameplay") ? 3 : 2, -1);
+    for (i = 0; i < n; i++, y += 32) {
+        const Item* it = &items[i];
+        int selr = (i == sel);
+        unsigned short fg = selr ? TI0 : TI3;
+        if (selr) fill(24, y - 3, SF_W - 48, 30, TI3);
+        if (it->kind == K_ACTION) {
+            snprintf(buf, sizeof buf, "[ %s ]", it->name);
+            text(SF_W / 2 - twidth(2, buf) / 2, y + 3, 2, fg, buf);
+            continue;
+        }
+        text(36, y + 3, 2, fg, it->name);
+        {
+            const char* v = it->opts[opt_index(it)].t;
+            int vw = twidth(2, v), vx = SF_W - 36 - 24 - vw;
+            text(vx, y + 3, 2, fg, v);
+            if (selr) {
+                arrow(vx - 16, y + 12, -1, TI0);
+                arrow(SF_W - 36 - 12, y + 12, 1, TI0);
+            }
+        }
+    }
+    ti_hint();
+    pv = items[sel].kind == K_CHOICE && items[sel].val == &g_cfg.mode;
+    wrap_text(22, 431, pv ? 50 : 57, 3, TI3, items[sel].help);
+    if (pv) preview(436, 428, g_cfg.mode);
 }
 
 #define PANEL_X 125
@@ -229,6 +316,7 @@ static void hint(void) {
 
 static void draw_main(int sel, const Item* items, int n) {
     int i;
+    if (g_cfg.look) { draw_main_ti(sel, items, n); return; }
     background();
     for (i = 0; i < n; i++) button(220, 144 + i * 48, 280, 40, items[i].name, i == sel);
     hint();
@@ -237,6 +325,7 @@ static void draw_main(int sel, const Item* items, int n) {
 static void draw_sub(const char* title, const Item* items, int n, int sel) {
     int i, h = 81 + ROW_H * n, x = PANEL_X, y = PANEL_Y, w = PANEL_W, ry, sy;
     char buf[48];
+    if (g_cfg.look) { draw_sub_ti(title, items, n, sel); return; }
     background();
     fill(x + 5, y + 5, w, h, COL_DROP);
     box3d(x, y, w, h, 0, COL_GRAY);
@@ -289,6 +378,7 @@ static unsigned poll_pressed(void) {
         else if ((held & m) && now >= g_next[i]) { pressed |= m; g_next[i] = now + 110; }
     }
     g_prev = b;
+    if (pressed & (SB_L1 | SB_R1)) g_cfg.look = !g_cfg.look;     /* theme: only here, never in the game */
     if ((b & SB_START) && (b & SB_SELECT)) return 0x80000000u;   /* leave */
     return pressed;
 }
@@ -313,37 +403,49 @@ static const char* const k_controls[][2] = {
     { "SELECT+START", "back to this menu" },
 };
 
+/* the text of a page, drawn from (x, ty), w wide, in the given colours */
+static void howto_body(int x, int ty, int w, int page, unsigned short ct, unsigned short ck, unsigned short cd) {
+    int i, cols = (w - 8) / 8;
+    if (page == 0) {
+        ty += 12 * wrap_text(x, ty, cols, 3, ct, "Ski down the mountain and stay on your feet. Trees and rocks knock you over.") + 4;
+        ty += 12 * wrap_text(x, ty, cols, 2, ct, "Jump off bumps and ramps, and do tricks in the air for style points.") + 6;
+        text(x, ty, 1, ck, "Pick a course by skiing through a sign at the start:");
+        ty += 14;
+        ty += 12 * wrap_text(x + 8, ty, cols - 2, 2, ct, "Slalom: a timed race through the gates. A missed gate adds 5 seconds.");
+        ty += 12 * wrap_text(x + 8, ty, cols - 2, 2, ct, "Tree Slalom: a longer timed race.");
+        ty += 12 * wrap_text(x + 8, ty, cols - 2, 2, ct, "Freestyle: no finish line. Score style points with jumps and tricks.") + 6;
+        wrap_text(x, ty, cols, 3, ct, "After 2000 m the yeti comes after you. If he catches you, press B to start again.");
+    } else {
+        for (i = 0; i < (int)(sizeof k_controls / sizeof k_controls[0]); i++, ty += 15) {
+            text(x, ty, 1, ck, k_controls[i][0]);
+            text(x + 104, ty, 1, ct, k_controls[i][1]);
+        }
+        wrap_text(x, ty + 3, cols, 2, cd, "You get back up on your own after a fall.");
+    }
+}
+
 static void draw_howto(int page) {
-    int x = HOW_X, y = HOW_Y, w = HOW_W, ty, i;
+    int x = HOW_X, y = HOW_Y, w = HOW_W;
     char pg[16];
+    snprintf(pg, sizeof pg, "%d/%d", page + 1, HOW_PAGES);
+    if (g_cfg.look) {
+        const char* h = "LEFT/RIGHT page  B back";
+        ti_frame(1, -1);
+        howto_body(36, 62, SF_W - 72, page, TI3, TI3, TI2);
+        text(SF_W / 2 - twidth(1, h) / 2, 398, 1, TI2, h);
+        text(SF_W - 36 - twidth(1, pg), 398, 1, TI3, pg);
+        return;
+    }
     background();
     fill(x + 5, y + 5, w, HOW_H, COL_DROP);
     box3d(x, y, w, HOW_H, 0, COL_GRAY);
     fill(x + 3, y + 3, w - 6, 22, COL_NAVY);
     text(x + 10, y + 6, 2, COL_WHITE, "How To Play");
-    snprintf(pg, sizeof pg, "%d/%d", page + 1, HOW_PAGES);
     text(x + w - 10 - twidth(2, pg), y + 6, 2, COL_YELLOW, pg);
     box3d(x + 8, y + 31, w - 16, HOW_H - 31 - 8, 1, COL_WHITE);
-    ty = y + 38;
-    if (page == 0) {
-        int cols = (w - 16 - 16) / 8;
-        ty += 12 * wrap_text(x + 16, ty, cols, 3, COL_BLACK, "Ski down the mountain and stay on your feet. Trees and rocks knock you over.") + 4;
-        ty += 12 * wrap_text(x + 16, ty, cols, 2, COL_BLACK, "Jump off bumps and ramps, and do tricks in the air for style points.") + 6;
-        text(x + 16, ty, 1, COL_NAVY, "Pick a course by skiing through a sign at the start:");
-        ty += 14;
-        ty += 12 * wrap_text(x + 24, ty, cols - 2, 2, COL_BLACK, "Slalom: a timed race through the gates. A missed gate adds 5 seconds.");
-        ty += 12 * wrap_text(x + 24, ty, cols - 2, 2, COL_BLACK, "Tree Slalom: a longer timed race.");
-        ty += 12 * wrap_text(x + 24, ty, cols - 2, 2, COL_BLACK, "Freestyle: no finish line. Score style points with jumps and tricks.") + 6;
-        ty += 12 * wrap_text(x + 16, ty, cols, 3, COL_BLACK, "After 2000 m the yeti comes after you. If he catches you, press B to start again.");
-    } else {
-        for (i = 0; i < (int)(sizeof k_controls / sizeof k_controls[0]); i++, ty += 15) {
-            text(x + 16, ty, 1, COL_NAVY, k_controls[i][0]);
-            text(x + 120, ty, 1, COL_BLACK, k_controls[i][1]);
-        }
-        wrap_text(x + 16, ty + 3, (w - 32) / 8, 2, COL_DGRAY, "You get back up on your own after a fall.");
-    }
+    howto_body(x + 16, y + 38, w - 32, page, COL_BLACK, COL_NAVY, COL_DGRAY);
     {
-        const char* h = "LEFT/RIGHT page    B back";
+        const char* h = "LEFT/RIGHT page    B back    L1/R1 theme";
         text(SF_W / 2 + 8 - twidth(1, h) / 2, 452, 1, COL_HINT, h);
     }
 }
@@ -374,7 +476,7 @@ static void restore(int which) {
         g_cfg.sound = d.sound; g_cfg.volume = d.volume; g_cfg.custom = d.custom;
         g_cfg.mode = d.mode; g_cfg.fps = d.fps;
     } else {
-        g_cfg.timing = d.timing; g_cfg.yeti = d.yeti; g_cfg.speed = d.speed; g_cfg.look = d.look;
+        g_cfg.timing = d.timing; g_cfg.yeti = d.yeti; g_cfg.speed = d.speed;
     }
 }
 
