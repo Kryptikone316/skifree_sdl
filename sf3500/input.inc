@@ -42,11 +42,20 @@ static const SfKey sfKeys[] = {
 static void sfPollInput(void) {
     static unsigned prev, nextRepeat[16];
     static int selectDown, comboUsed;
+    static int traceOn = -1;
+    static unsigned polls;
     unsigned b = sf3500_buttons(), pressed = b & ~prev, released = prev & ~b;
     unsigned now = SDL_GetTicks();
     size_t i;
 
     if ((b & SB_START) && (b & SB_SELECT)) sf3500_quit(0);
+
+    /* test hook: SKI_TRACE=<n> prints the game state every n frames */
+    if (traceOn < 0) traceOn = getenv("SKI_TRACE") ? atoi(getenv("SKI_TRACE")) : 0;
+    if (traceOn > 0 && ++polls % (unsigned)traceOn == 0)
+        fprintf(stderr, "trace f=%u player=%s frame=%d dist=%d x=%d running=%d paused=%d turbo=%d\n", polls,
+                playerActor ? "alive" : "none", playerActor ? (int)playerActor->frameNo : -1, (int)playerY,
+                (int)playerX, (int)isGameTimerRunning, (int)isPaused, (int)isTurboMode);
 
     for (i = 0; i < sizeof(sfKeys) / sizeof(sfKeys[0]); i++) {
         const SfKey* k = &sfKeys[i];
