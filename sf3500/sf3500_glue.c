@@ -16,6 +16,28 @@ static SDL_Renderer* g_ren;
 static int g_fps = 40, g_headless, g_shot_every, g_maxframes;
 static unsigned g_frame, g_last_ticks;
 static const char* g_shots;
+static unsigned short g_lut[65536];          /* RGB565 -> TI-92 LCD shade */
+static int g_look, g_vx, g_vy, g_vw, g_vh;   /* look filter on, and the game's window rect */
+
+/* TI-92 look: the calculator shows four grays on a green-gray LCD, with a dark bezel around. */
+#define LCD(r, g, b) ((unsigned short)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3)))
+static void build_look_lut(void) {
+    static const unsigned short shade[4] = { LCD(190, 204, 180), LCD(146, 164, 140), LCD(84, 102, 92), LCD(26, 36, 38) };
+    int i;
+    for (i = 0; i < 65536; i++) {
+        int r = ((i >> 11) & 31) * 255 / 31, g = ((i >> 5) & 63) * 255 / 63, b = (i & 31) * 255 / 31;
+        int l = (r * 299 + g * 587 + b * 114) / 1000;
+        g_lut[i] = shade[l >= 205 ? 0 : (l >= 140 ? 1 : (l >= 70 ? 2 : 3))];
+    }
+}
+
+static void apply_look(void) {
+    int y, x;
+    for (y = g_vy; y < g_vy + g_vh; y++) {
+        unsigned short* p = (unsigned short*)((unsigned char*)g_surf->pixels + y * g_surf->pitch) + g_vx;
+        for (x = 0; x < g_vw; x++) p[x] = g_lut[p[x]];
+    }
+}
 static char g_script[1024];
 
 /* Video modes: the game sees view_w x view_h pixels drawn scale times bigger, in a window
@@ -85,7 +107,10 @@ SDL_Renderer* sf3500_make_renderer(void) {
     sf3500_mode_info(g_cfg.mode, &vw, &vh, &scale, &ww, &wh);
     x0 = ((SF_W - ww) / 2) & ~1;      /* even: keeps 32-bit blits aligned */
     y0 = (SF_H - wh) / 2;
-    SDL_FillRect(g_surf, NULL, 0);
+    g_look = g_cfg.look;
+    g_vx = x0; g_vy = y0; g_vw = ww; g_vh = wh;
+    if (g_look) build_look_lut();
+    SDL_FillRect(g_surf, NULL, g_look ? LCD(26, 36, 38) : 0);
     g_view = SDL_CreateRGBSurfaceWithFormatFrom((unsigned char*)g_surf->pixels + y0 * g_surf->pitch + x0 * 2,
                                                 ww, wh, 16, g_surf->pitch, SDL_PIXELFORMAT_RGB565);
     if (!g_view) return NULL;
@@ -108,6 +133,7 @@ static void save_shot(void) {
 
 void sf3500_present(void) {
     unsigned now, target;
+    if (g_look) apply_look();
     if (!g_headless)
         hwdisp_present(g_surf->pixels, SF_W, SF_H, g_surf->pitch);
     g_frame++;

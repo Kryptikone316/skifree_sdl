@@ -15,6 +15,7 @@ void cfg_defaults(void) {
     g_cfg.timing = 1;
     g_cfg.yeti = 2000;
     g_cfg.speed = 100;
+    g_cfg.look = 0;
     g_cfg.nice = -10;
 }
 
@@ -29,6 +30,7 @@ static void validate(void) {
     g_cfg.timing = g_cfg.timing != 0;
     g_cfg.yeti = clampi(g_cfg.yeti, 0, 2000);   /* the skier's y position is a 16-bit number: 2047 m is the end of the map */
     g_cfg.speed = clampi(g_cfg.speed, 25, 200);
+    g_cfg.look = g_cfg.look != 0;
     g_cfg.nice = clampi(g_cfg.nice, -20, 19);
 }
 
@@ -41,6 +43,7 @@ static void set(const char* key, int v) {
     else if (!strcmp(key, "timing")) g_cfg.timing = v;
     else if (!strcmp(key, "yeti")) g_cfg.yeti = v;
     else if (!strcmp(key, "speed")) g_cfg.speed = v;
+    else if (!strcmp(key, "look")) g_cfg.look = v;
     else if (!strcmp(key, "nice")) g_cfg.nice = v;
 }
 
@@ -81,6 +84,7 @@ void cfg_load(const char* path) {
     if (env_has("SKI_TIMING")) g_cfg.timing = atoi(getenv("SKI_TIMING"));
     if (env_has("SKI_YETI")) g_cfg.yeti = atoi(getenv("SKI_YETI"));
     if (env_has("SKI_SPEED")) g_cfg.speed = atoi(getenv("SKI_SPEED"));
+    if (env_has("SKI_LOOK")) g_cfg.look = atoi(getenv("SKI_LOOK"));
     validate();
 }
 
@@ -111,10 +115,12 @@ int cfg_save(const char* path) {
         "yeti=%d\n"
         "# speed: game speed in percent (100 = original)\n"
         "speed=%d\n"
+        "# look: 0 = original colours, 1 = TI-92 calculator look (colours only, the game is unchanged)\n"
+        "look=%d\n"
         "# nice: process priority, -10 keeps the frames even\n"
         "nice=%d\n",
         g_cfg.sound, g_cfg.volume, g_cfg.custom, g_cfg.mode, g_cfg.fps, g_cfg.timing,
-        g_cfg.yeti, g_cfg.speed, g_cfg.nice);
+        g_cfg.yeti, g_cfg.speed, g_cfg.look, g_cfg.nice);
     if (fclose(f) != 0) { remove(tmp); return -1; }
     return rename(tmp, path);
 }

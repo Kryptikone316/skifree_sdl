@@ -52,6 +52,7 @@ static const Opt o_fps[] = { { 20, "20 fps" }, { 30, "30 fps" }, { 40, "40 fps" 
 static const Opt o_timing[] = { { 0, "Smooth" }, { 1, "Original" } };
 static const Opt o_yeti[] = { { 0, "Never" }, { 250, "250 m" }, { 500, "500 m" },
                               { 1000, "1000 m" }, { 2000, "2000 m (orig)" } };
+static const Opt o_look[] = { { 0, "Original" }, { 1, "TI-92" } };
 static const Opt o_speed[] = { { 50, "50%" }, { 75, "75%" }, { 100, "100% (orig)" }, { 125, "125%" }, { 150, "150%" } };
 
 #define N(a) ((int)(sizeof(a) / sizeof((a)[0])))
@@ -82,6 +83,8 @@ static Item game_items[] = {
       "How far you ski before the yeti shows up. Never = practice mode, no yeti at all." },
     { K_CHOICE, "Game speed", &g_cfg.speed, o_speed, N(o_speed), 0,
       "Slow the whole game down to practise, or speed it up." },
+    { K_CHOICE, "Look", &g_cfg.look, o_look, N(o_look), 0,
+      "TI-92 shows the game in the four grays of the calculator version. Looks only, the game is unchanged." },
     { K_ACTION, "Restore defaults", 0, 0, 0, A_RESET_GAME, "Put the gameplay settings back." },
 };
 
@@ -298,7 +301,7 @@ static void restore(int which) {
         g_cfg.sound = d.sound; g_cfg.volume = d.volume; g_cfg.custom = d.custom;
         g_cfg.mode = d.mode; g_cfg.fps = d.fps;
     } else {
-        g_cfg.timing = d.timing; g_cfg.yeti = d.yeti; g_cfg.speed = d.speed;
+        g_cfg.timing = d.timing; g_cfg.yeti = d.yeti; g_cfg.speed = d.speed; g_cfg.look = d.look;
     }
 }
 

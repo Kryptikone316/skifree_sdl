@@ -15,6 +15,7 @@ typedef struct {
     int timing;   /* 0 = smooth (physics every frame), 1 = original (40 ms steps) */
     int yeti;     /* metres before the yeti shows up, 0 = never */
     int speed;    /* game speed in percent, 100 = original */
+    int look;     /* 0 = original colours, 1 = TI-92 calculator look (looks only) */
     int nice;     /* process priority */
 } SkiCfg;
 
