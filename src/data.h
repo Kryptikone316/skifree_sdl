@@ -492,6 +492,7 @@ int updateTimerDurationMillis;
 void* DAT_0040c78c;
 Actor* currentFreeActor;
 BOOL isTurboMode;
+BOOL isSlowMode;   /* SF3500: half speed (the S key) */
 // HDC smallBitmapDC;
 SDL_Surface* smallBitmapDC;
 HDC smallBitmapDC_1bpp;

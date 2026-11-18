@@ -5,8 +5,7 @@
  *   A / Y          straight down-right / down-left   (keyboard C / A)
  *   B, R1          jump (the mouse-click jump), also restarts after a crash
  *   X              short hop (keyboard ` )
- *   L2 / R2        face left / right across the slope (KP 7 / KP 9)
- *   L1             speed boost on/off ('f' in the original)
+ *   R2 / L2        the F key (speed boost on/off) / the S key (half speed on/off), a tap each
  *   START          new game (F2)         SELECT  pause/resume (F3), on release
  *   SELECT+START   back to the launcher menu
  */
@@ -32,8 +31,7 @@ static const SfKey sfKeys[] = {
     { SB_LEFT, SDLK_LEFT, 1 },   { SB_RIGHT, SDLK_RIGHT, 1 },
     { SB_UP, SDLK_UP, 1 },       { SB_DOWN, SDLK_DOWN, 1 },
     { SB_A, SDLK_c, 0 },         { SB_Y, SDLK_a, 0 },
-    { SB_X, SDLK_BACKQUOTE, 0 }, { SB_L2, SDLK_KP_7, 0 },
-    { SB_R2, SDLK_KP_9, 0 },
+    { SB_X, SDLK_BACKQUOTE, 0 },
 };
 
 #define SF_REPEAT_DELAY 230
@@ -53,9 +51,9 @@ static void sfPollInput(void) {
     /* test hook: SKI_TRACE=<n> prints the game state every n frames */
     if (traceOn < 0) traceOn = getenv("SKI_TRACE") ? atoi(getenv("SKI_TRACE")) : 0;
     if (traceOn > 0 && ++polls % (unsigned)traceOn == 0)
-        fprintf(stderr, "trace ms=%u f=%u player=%s frame=%d dist=%d x=%d running=%d paused=%d turbo=%d modes=%d%d%d t=%d ax=%d ay=%d\n", (unsigned)SDL_GetTicks(), polls,
+        fprintf(stderr, "trace ms=%u f=%u player=%s frame=%d dist=%d x=%d running=%d paused=%d turbo=%d slow=%d modes=%d%d%d t=%d ax=%d ay=%d\n", (unsigned)SDL_GetTicks(), polls,
                 playerActor ? "alive" : "none", playerActor ? (int)playerActor->frameNo : -1, (int)playerY,
-                (int)playerX, (int)isGameTimerRunning, (int)isPaused, (int)isTurboMode, (int)isSsGameMode, (int)isFsGameMode, (int)isGsGameMode, (int)elapsedTime, playerActor ? (int)playerActor->xPosMaybe : 0, playerActor ? (int)playerActor->yPosMaybe : 0);
+                (int)playerX, (int)isGameTimerRunning, (int)isPaused, (int)isTurboMode, (int)isSlowMode, (int)isSsGameMode, (int)isFsGameMode, (int)isGsGameMode, (int)elapsedTime, playerActor ? (int)playerActor->xPosMaybe : 0, playerActor ? (int)playerActor->yPosMaybe : 0);
 
     for (i = 0; i < sizeof(sfKeys) / sizeof(sfKeys[0]); i++) {
         const SfKey* k = &sfKeys[i];
@@ -68,7 +66,9 @@ static void sfPollInput(void) {
         }
     }
     if (pressed & (SB_B | SB_R1)) sfJump();
-    if (pressed & SB_L1) isTurboMode = (isTurboMode == 0);
+    /* R2 = the F key (double speed), L2 = the S key (half speed): one tap each, they cancel each other */
+    if (pressed & SB_R2) { isTurboMode = (isTurboMode == 0); if (isTurboMode) isSlowMode = 0; }
+    if (pressed & SB_L2) { isSlowMode = (isSlowMode == 0); if (isSlowMode) isTurboMode = 0; }
     if ((pressed & SB_START) && !(b & SB_SELECT)) handleGameReset();
 
     if (pressed & SB_SELECT) { selectDown = 1; comboUsed = 0; }

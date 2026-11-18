@@ -48,7 +48,7 @@ static int gameSpeedPercent = 100;
 
 static void updateMovementOnly(void);
 
-static int takeScaledMovement(short velocity, float* remainder) {
+static int takeScaledMovement(float velocity, float* remainder) {
     int movement;
 
     *remainder += velocity * physicsFrameScale;
@@ -695,12 +695,12 @@ Actor* updateActorPositionWithVelocityMaybe(Actor* actor) {
     short inAir;
     int actorIndex;
     int counterUpdates;
-    int speedMultiplier;
+    float speedMultiplier;
 
     ski_assert(actor, 1061);
 
     actorIndex = (int)(actor - actors);
-    speedMultiplier = isTurboMode != 0 ? 2 : 1;
+    speedMultiplier = isTurboMode != 0 ? 2.0f : (isSlowMode != 0 ? 0.5f : 1.0f);
     newX = actor->xPosMaybe + takeScaledMovement(actor->HorizontalVelMaybe * speedMultiplier, &actorMovementRemainderX[actorIndex]);
     newY = actor->yPosMaybe + takeScaledMovement(actor->verticalVelocityMaybe * speedMultiplier, &actorMovementRemainderY[actorIndex]);
     inAir = actor->isInAir + takeScaledMovement(actor->inAirCounter * speedMultiplier, &actorMovementRemainderAir[actorIndex]);
@@ -905,7 +905,11 @@ void handleCharMessage(uint32_t charCode) {
         break;
     case 'f':
         isTurboMode = (isTurboMode == 0);
-        /* 'f' key */
+        if (isTurboMode) isSlowMode = 0;
+        return;
+    case 's':
+        isSlowMode = (isSlowMode == 0);
+        if (isSlowMode) isTurboMode = 0;
         return;
     case 'r':
         /* 'r' */
@@ -2925,6 +2929,7 @@ BOOL resetGame(void) {
     totalAreaOfActorSprites = 0;
     resetPermObjectCount();
     isTurboMode = 0;
+    isSlowMode = 0;
     playerY = 0;
     playerX = 0;
     DAT_0040c5d8 = 0;
