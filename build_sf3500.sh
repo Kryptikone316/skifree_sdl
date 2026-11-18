@@ -15,8 +15,8 @@ CXXFLAGS="$ARCH -O2 -w -fno-exceptions -fno-rtti -Isf3500"
 OUT=${OUT:-build-sf3500}
 mkdir -p "$OUT"
 $CC $CFLAGS -c src/skifree_decomp.c -o "$OUT/skifree_decomp.o"
-for f in peres ttfshim sf3500_glue; do $CC $CFLAGS -c sf3500/$f.c -o "$OUT/$f.o"; done
-for f in hwdisp joykey; do $CXX $CXXFLAGS -c sf3500/$f.cpp -o "$OUT/$f.o"; done
+for f in peres ttfshim sf3500_glue config sfsound launcher; do $CC $CFLAGS -c sf3500/$f.c -o "$OUT/$f.o"; done
+for f in hwdisp joykey hwaudio sf3500_mixer; do $CXX $CXXFLAGS -c sf3500/$f.cpp -o "$OUT/$f.o"; done
 $CXX $ARCH "$OUT"/*.o -o "$OUT/skifree.mipsel" -lSDL2 -lpthread -ldl -lm
 $TC/bin/mips-mti-linux-gnu-strip -o "$OUT/skifree.stripped.mipsel" "$OUT/skifree.mipsel"
 ls -l "$OUT"/skifree*.mipsel

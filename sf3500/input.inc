@@ -8,7 +8,7 @@
  *   L2 / R2        face left / right across the slope (KP 7 / KP 9)
  *   L1             speed boost on/off ('f' in the original)
  *   START          new game (F2)         SELECT  pause/resume (F3), on release
- *   SELECT+START   quit
+ *   SELECT+START   back to the launcher menu
  */
 #ifdef SF3500
 #include "sf3500.h"
@@ -48,12 +48,12 @@ static void sfPollInput(void) {
     unsigned now = SDL_GetTicks();
     size_t i;
 
-    if ((b & SB_START) && (b & SB_SELECT)) sf3500_quit(0);
+    if ((b & SB_START) && (b & SB_SELECT)) sf3500_quit(SF_EXIT_MENU);
 
     /* test hook: SKI_TRACE=<n> prints the game state every n frames */
     if (traceOn < 0) traceOn = getenv("SKI_TRACE") ? atoi(getenv("SKI_TRACE")) : 0;
     if (traceOn > 0 && ++polls % (unsigned)traceOn == 0)
-        fprintf(stderr, "trace f=%u player=%s frame=%d dist=%d x=%d running=%d paused=%d turbo=%d modes=%d%d%d t=%d ax=%d ay=%d\n", polls,
+        fprintf(stderr, "trace ms=%u f=%u player=%s frame=%d dist=%d x=%d running=%d paused=%d turbo=%d modes=%d%d%d t=%d ax=%d ay=%d\n", (unsigned)SDL_GetTicks(), polls,
                 playerActor ? "alive" : "none", playerActor ? (int)playerActor->frameNo : -1, (int)playerY,
                 (int)playerX, (int)isGameTimerRunning, (int)isPaused, (int)isTurboMode, (int)isSsGameMode, (int)isFsGameMode, (int)isGsGameMode, (int)elapsedTime, playerActor ? (int)playerActor->xPosMaybe : 0, playerActor ? (int)playerActor->yPosMaybe : 0);
 

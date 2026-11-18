@@ -13,6 +13,9 @@
 #include <string.h>
 
 #ifdef SF3500
+#include "../sf3500/config.h"
+#include "../sf3500/launcher.h"
+#include "../sf3500/sfsound.h"
 #include "../sf3500/input.inc"
 #endif
 
@@ -30,6 +33,18 @@ static float permObjectMovementRemainderY[NUM_PERM_OBJECTS];
 static float permObjectMovementRemainderAir[NUM_PERM_OBJECTS];
 static DWORD logicTimeAccumulator;
 static BOOL perFramePhysicsEnabled = TRUE;
+#ifdef SF3500
+/* launcher settings: where the yeti starts chasing (16 world units per metre, 2000 m in the
+ * original), whether it comes at all, and the game speed (the step length is 40 ms at 100%) */
+static short yetiStartY = 32000;
+static int yetiEnabled = 1;
+static int gameSpeedPercent = 100;
+#define YETI_START_Y yetiStartY
+#define YETI_ENABLED yetiEnabled
+#else
+#define YETI_START_Y 32000
+#define YETI_ENABLED 1
+#endif
 
 static void updateMovementOnly(void);
 
@@ -69,6 +84,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 #ifdef SF3500
+    cfg_load("skifree.txt");
     if (sf3500_start() != 0) return 1;
     {
         const char* exe = getenv("SKI_EXE");
@@ -79,6 +95,20 @@ int main(int argc, char* argv[]) {
         }
         fprintf(stderr, "ski32.exe: %d bitmaps loaded\n", peres_bitmap_count());
     }
+    if (!getenv("SKI_NOMENU")) {
+        if (!launcher_run("skifree.txt")) sf3500_quit(0);
+    }
+    /* settings from the launcher */
+    sf3500_set_fps(g_cfg.fps);
+    perFramePhysicsEnabled = (g_cfg.timing == 0);
+    yetiEnabled = (g_cfg.yeti > 0);
+    yetiStartY = (short)((g_cfg.yeti > 0 ? g_cfg.yeti : 2000) * 16);
+    gameSpeedPercent = g_cfg.speed;
+    /* test hook: force the yeti start distance (metres) whatever the setting, to test "never" at a short course */
+    if (getenv("SKI_TEST_YETI_M")) yetiStartY = (short)(atoi(getenv("SKI_TEST_YETI_M")) * 16);
+    sfsnd_prepare();
+    fprintf(stderr, "settings: sound %d vol %d custom %d screen %d fps %d timing %d yeti %d speed %d\n", g_cfg.sound,
+            g_cfg.volume, g_cfg.custom, g_cfg.mode, g_cfg.fps, g_cfg.timing, g_cfg.yeti, g_cfg.speed);
 #endif
 
     TTF_Init();
@@ -634,6 +664,18 @@ uint16_t getSpriteIdxForActorType(int actorType) {
 }
 
 void playSound(Sound* sound) {
+#ifdef SF3500
+    if (sound == &sound_1) sfsnd_play(1);
+    else if (sound == &sound_2) sfsnd_play(2);
+    else if (sound == &sound_3) sfsnd_play(3);
+    else if (sound == &sound_4) sfsnd_play(4);
+    else if (sound == &sound_5) sfsnd_play(5);
+    else if (sound == &sound_6) sfsnd_play(6);
+    else if (sound == &sound_7) sfsnd_play(7);
+    else if (sound == &sound_8) sfsnd_play(8);
+    else if (sound == &sound_9) sfsnd_play(9);
+    return;
+#endif
     // if (isSoundDisabled == 0)
     // {
     //     if ((sound->soundData == NULL) && (sound->soundResource != NULL))
@@ -2735,7 +2777,7 @@ void updateYeti(PermObject* permObject) {
         local_c = 0;
         if (iVar6 == ACTOR_TYPE_5_YETI_TOP && permObjY > -2000) {
             sVar9 = -10;
-        } else if (iVar6 == ACTOR_TYPE_6_YETI_BOTTOM && permObjY < 32000) {
+        } else if (iVar6 == ACTOR_TYPE_6_YETI_BOTTOM && permObjY < YETI_START_Y) {
             sVar9 = 0x1a;
         } else if (iVar6 == ACTOR_TYPE_7_YETI_LEFT && permObjX > -16000) {
             local_c = -0x10;
@@ -2756,7 +2798,7 @@ void updateYeti(PermObject* permObject) {
                 //                }
                 //                else if (iVar6 == 7 && sVar3 < -16000)
 
-                if ((iVar6 == ACTOR_TYPE_5_YETI_TOP && pY < -2000) || (iVar6 == ACTOR_TYPE_6_YETI_BOTTOM && pY > 32000) || (iVar6 == ACTOR_TYPE_7_YETI_LEFT && pX < -16000) || (iVar6 == ACTOR_TYPE_8_YETI_RIGHT && pX > 16000)) {
+                if (YETI_ENABLED && ((iVar6 == ACTOR_TYPE_5_YETI_TOP && pY < -2000) || (iVar6 == ACTOR_TYPE_6_YETI_BOTTOM && pY > YETI_START_Y) || (iVar6 == ACTOR_TYPE_7_YETI_LEFT && pX < -16000) || (iVar6 == ACTOR_TYPE_8_YETI_RIGHT && pX > 16000))) {
                     dX = (int)pX - (int)permObjX;
                     dY = (int)pY - (int)permObjY;
                     //                    sVar9 = (short) windowWidth;
@@ -2893,7 +2935,11 @@ BOOL resetGame(void) {
     INT_0040c960 = 0;
     isGsGameMode = 0;
     elapsedTime = 0;
+#ifdef SF3500
+    updateTimerDurationMillis = 4000 / gameSpeedPercent;
+#else
     updateTimerDurationMillis = 40;
+#endif
     redrawRequired = 1;
     return 1;
 }
@@ -3373,17 +3419,17 @@ void setupPermObjects() {
     permObject.unk_0x1e = 0;
     permObject.yVelocity = 0;
     permObject.xVelocity = 0;
-    addPermObject(&PermObjectList_0040c720, &permObject);
+    if (YETI_ENABLED) addPermObject(&PermObjectList_0040c720, &permObject);
     permObject.actorTypeMaybe = ACTOR_TYPE_8_YETI_RIGHT;
     permObject.maybeX = 16060;
-    addPermObject(&PermObjectList_0040c720, &permObject);
+    if (YETI_ENABLED) addPermObject(&PermObjectList_0040c720, &permObject);
     permObject.actorTypeMaybe = ACTOR_TYPE_5_YETI_TOP;
     permObject.maybeX = 0;
     permObject.maybeY = -2060;
-    addPermObject(&PermObjectList_0040c720, &permObject);
+    if (YETI_ENABLED) addPermObject(&PermObjectList_0040c720, &permObject);
     permObject.actorTypeMaybe = ACTOR_TYPE_6_YETI_BOTTOM;
-    permObject.maybeY = 32060;
-    addPermObject(&PermObjectList_0040c720, &permObject);
+    permObject.maybeY = YETI_START_Y + 60;
+    if (YETI_ENABLED) addPermObject(&PermObjectList_0040c720, &permObject);
 }
 
 // TODO not byte accurate

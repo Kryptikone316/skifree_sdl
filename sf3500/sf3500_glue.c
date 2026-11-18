@@ -2,18 +2,38 @@
 #include "SDL_ttf.h"
 #include "hwdisp.hpp"
 #include "joykey.hpp"
+#include "config.h"
+#include "sfsound.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
 
-static SDL_Surface* g_surf;
+static SDL_Surface* g_surf;      /* the whole 640x480 screen */
+static SDL_Surface* g_view;      /* the game's window inside it (video modes below) */
 static SDL_Renderer* g_ren;
-static int g_zoom = 1, g_fps = 40, g_headless, g_shot_every, g_maxframes;
+static int g_fps = 40, g_headless, g_shot_every, g_maxframes;
 static unsigned g_frame, g_last_ticks;
 static const char* g_shots;
 static char g_script[1024];
+
+/* Video modes: the game sees view_w x view_h pixels drawn scale times bigger, in a window
+ * of view*scale centered on the 640x480 screen; the rest stays black (pillarbox/letterbox),
+ * like the original's window on a desktop. */
+static const struct { int vw, vh, scale; } k_modes[CFG_NMODES] = {
+    { 640, 480, 1 },   /* fills the screen */
+    { 480, 360, 1 },
+    { 320, 240, 1 },
+    { 320, 240, 2 },   /* fills the screen */
+    { 256, 192, 2 },
+};
+
+void sf3500_mode_info(int mode, int* vw, int* vh, int* scale, int* ww, int* wh) {
+    if (mode < 0 || mode >= CFG_NMODES) mode = 0;
+    *vw = k_modes[mode].vw; *vh = k_modes[mode].vh; *scale = k_modes[mode].scale;
+    *ww = *vw * *scale; *wh = *vh * *scale;
+}
 
 static int env_int(const char* name, int def) {
     const char* v = getenv(name);
@@ -22,12 +42,7 @@ static int env_int(const char* name, int def) {
 
 int sf3500_start(void) {
     const char* s;
-    g_zoom = env_int("SKI_ZOOM", 1);
-    if (g_zoom < 1) g_zoom = 1;
-    if (g_zoom > 3) g_zoom = 3;
-    g_fps = env_int("SKI_FPS", 40);
-    if (g_fps < 5) g_fps = 5;
-    if (g_fps > 120) g_fps = 120;
+    g_fps = g_cfg.fps;
     g_headless = env_int("SKI_HEADLESS", 0);
     g_shots = getenv("SKI_SHOTS");
     g_shot_every = env_int("SKI_SHOT_EVERY", 0);
@@ -37,8 +52,7 @@ int sf3500_start(void) {
 
     /* the card's background scripts wake up often; a better priority keeps frames even
      * (Water Closet: late frames 14-19 per 2 s -> 0 with nice -10) */
-    s = getenv("SKI_NICE");
-    if (s && *s) setpriority(PRIO_PROCESS, 0, atoi(s));
+    if (g_cfg.nice) setpriority(PRIO_PROCESS, 0, g_cfg.nice);
 
     if (!g_headless) {
         if (hwdisp_init() != 0) {
@@ -52,19 +66,38 @@ int sf3500_start(void) {
         fprintf(stderr, "sf3500: surface: %s\n", SDL_GetError());
         return -1;
     }
-    fprintf(stderr, "sf3500: zoom %d, fps cap %d%s\n", g_zoom, g_fps, g_headless ? ", headless" : "");
+    fprintf(stderr, "sf3500: fps cap %d%s\n", g_fps, g_headless ? ", headless" : "");
     return 0;
 }
 
+unsigned short* sf3500_pixels(int* stride_px) {
+    if (stride_px) *stride_px = g_surf->pitch / 2;
+    return (unsigned short*)g_surf->pixels;
+}
+
+void sf3500_set_fps(int fps) {
+    g_fps = fps < 5 ? 5 : (fps > 120 ? 120 : fps);
+}
+
+/* Software renderer on the game's window inside the screen, picked by g_cfg.mode. */
 SDL_Renderer* sf3500_make_renderer(void) {
-    g_ren = SDL_CreateSoftwareRenderer(g_surf);
-    if (g_ren && g_zoom > 1) SDL_RenderSetLogicalSize(g_ren, SF_W / g_zoom, SF_H / g_zoom);
+    int vw, vh, scale, ww, wh, x0, y0;
+    sf3500_mode_info(g_cfg.mode, &vw, &vh, &scale, &ww, &wh);
+    x0 = ((SF_W - ww) / 2) & ~1;      /* even: keeps 32-bit blits aligned */
+    y0 = (SF_H - wh) / 2;
+    SDL_FillRect(g_surf, NULL, 0);
+    g_view = SDL_CreateRGBSurfaceWithFormatFrom((unsigned char*)g_surf->pixels + y0 * g_surf->pitch + x0 * 2,
+                                                ww, wh, 16, g_surf->pitch, SDL_PIXELFORMAT_RGB565);
+    if (!g_view) return NULL;
+    g_ren = SDL_CreateSoftwareRenderer(g_view);
+    if (g_ren && scale > 1) SDL_RenderSetLogicalSize(g_ren, vw, vh);
+    fprintf(stderr, "sf3500: screen mode %d: view %dx%d, scale %d, window %dx%d at %d,%d\n", g_cfg.mode, vw, vh, scale, ww, wh, x0, y0);
     return g_ren;
 }
 
 void sf3500_output_size(int* w, int* h) {
-    *w = SF_W / g_zoom;
-    *h = SF_H / g_zoom;
+    int scale, ww, wh;
+    sf3500_mode_info(g_cfg.mode, w, h, &scale, &ww, &wh);
 }
 
 static void save_shot(void) {
@@ -116,6 +149,7 @@ unsigned sf3500_buttons(void) {
 }
 
 void sf3500_quit(int code) {
+    sfsnd_shutdown();
     if (!g_headless) hwdisp_deinit();
     exit(code);
 }
