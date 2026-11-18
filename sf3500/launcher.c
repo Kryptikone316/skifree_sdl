@@ -2,9 +2,11 @@
 #include "config.h"
 #include "sf3500.h"
 #include "sfsound.h"
+#include "theme16.h"
 #include "SDL_ttf.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <string.h>
 
@@ -309,6 +311,138 @@ static void draw_sub_ti(const char* title, const Item* items, int n, int sel) {
     if (pv) preview(436, 428, g_cfg.mode);
 }
 
+/* ---- 16-bit theme: a code-drawn snow scene behind translucent navy panels with an amber selection bar ---- */
+
+static unsigned short* g_bg16;
+
+static void blend(int x, int y, int w, int h, unsigned short c, int a) {   /* a: 0..256 */
+    int cr = (c >> 11) & 31, cg = (c >> 5) & 63, cb = c & 31, i, j;
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x + w > SF_W) w = SF_W - x;
+    if (y + h > SF_H) h = SF_H - y;
+    for (j = 0; j < h; j++) {
+        unsigned short* p = g_px + (y + j) * g_stride + x;
+        for (i = 0; i < w; i++) {
+            unsigned v = p[i];
+            int r = (int)((v >> 11) & 31), g = (int)((v >> 5) & 63), b = (int)(v & 31);
+            r = (r * (256 - a) + cr * a) >> 8; g = (g * (256 - a) + cg * a) >> 8; b = (b * (256 - a) + cb * a) >> 8;
+            p[i] = (unsigned short)((r << 11) | (g << 5) | b);
+        }
+    }
+}
+
+static void vgrad(int x, int y, int w, int h, unsigned short c0, unsigned short c1) {
+    int j;
+    for (j = 0; j < h; j++) {
+        int r0 = (c0 >> 11) & 31, g0 = (c0 >> 5) & 63, b0 = c0 & 31, r1 = (c1 >> 11) & 31, g1 = (c1 >> 5) & 63, b1 = c1 & 31;
+        int t = h > 1 ? j * 256 / (h - 1) : 0;
+        fill(x, y + j, w, 1, (unsigned short)((((r0 * (256 - t) + r1 * t) >> 8) << 11) | (((g0 * (256 - t) + g1 * t) >> 8) << 5) | ((b0 * (256 - t) + b1 * t) >> 8)));
+    }
+}
+
+static void stext(int x, int y, int scale, unsigned short c, unsigned short shadow, const char* s) {
+    text(x + scale, y + scale, scale, shadow, s);
+    text(x, y, scale, c, s);
+}
+
+#define S16_PANEL   C(14, 24, 70)
+#define S16_EDGE    C(150, 196, 255)
+#define S16_EDGE2   C(60, 100, 190)
+#define S16_TEXT    C(222, 234, 255)
+#define S16_VALUE   C(140, 208, 255)
+#define S16_AMBER0  C(255, 204, 70)
+#define S16_AMBER1  C(236, 126, 24)
+#define S16_BROWN   C(72, 32, 0)
+#define S16_SHADOW  C(6, 10, 36)
+
+static void background16(int dim) {
+    if (!g_bg16) {
+        g_bg16 = (unsigned short*)malloc((size_t)SF_W * SF_H * 2);
+        if (g_bg16) theme16_render(g_bg16, SF_W);
+    }
+    if (!g_bg16) { background(); return; }
+    {
+        int y;
+        for (y = 0; y < SF_H; y++) memcpy(g_px + y * g_stride, g_bg16 + y * SF_W, SF_W * 2);
+    }
+    if (dim) blend(0, 0, SF_W, SF_H, C(12, 22, 64), dim);
+}
+
+static void panel16(int x, int y, int w, int h) {
+    blend(x + 6, y + 6, w, h, COL_BLACK, 110);
+    blend(x, y, w, h, S16_PANEL, 226);
+    fill(x, y, w, 2, S16_EDGE); fill(x, y, 2, h, S16_EDGE);
+    fill(x, y + h - 2, w, 2, S16_EDGE2); fill(x + w - 2, y, 2, h, S16_EDGE2);
+    fill(x + 2, y + 2, w - 4, 1, S16_EDGE2);
+}
+
+static void hint16(const char* h) {
+    blend(0, 446, SF_W, 34, COL_BLACK, 150);
+    stext(SF_W / 2 - twidth(1, h) / 2, 458, 1, COL_WHITE, S16_SHADOW, h);
+}
+
+static void bar16(int x, int y, int w, int h, int selected) {
+    if (selected) {
+        vgrad(x, y, w, h, S16_AMBER0, S16_AMBER1);
+        fill(x, y, w, 1, C(255, 240, 180)); fill(x, y + h - 1, w, 1, C(140, 70, 10));
+    }
+}
+
+static void draw_main16(int sel, const Item* items, int n) {
+    int i, x = 172, y = 70, w = 256, h = 12 + n * 35 + 2;
+    const char* t = "SkiFree";
+    int tx = 300 - twidth(6, t) / 2, dx, dy;
+    background16(0);
+    for (dy = -3; dy <= 3; dy += 3) for (dx = -3; dx <= 3; dx += 3) if (dx || dy) text(tx + dx, 12 + dy, 6, C(16, 28, 96), t);
+    text(tx, 15, 6, C(236, 122, 20), t);
+    text(tx, 12, 6, C(255, 230, 70), t);
+    panel16(x, y, w, h);
+    for (i = 0; i < n; i++) {
+        int by = y + 8 + i * 35, sl = (i == sel);
+        if (sl) bar16(x + 8, by, w - 16, 31, 1);
+        else { blend(x + 8, by, w - 16, 31, C(60, 110, 220), 120); fill(x + 8, by, w - 16, 1, S16_EDGE2); }
+        if (sl) text(x + (w - twidth(2, items[i].name)) / 2, by + 8, 2, S16_BROWN, items[i].name);
+        else stext(x + (w - twidth(2, items[i].name)) / 2, by + 8, 2, COL_WHITE, S16_SHADOW, items[i].name);
+    }
+    hint16("UP/DOWN choose  LEFT/RIGHT change  A select  B back  L1/R1 theme");
+}
+
+static void draw_sub16(const char* title, const Item* items, int n, int sel) {
+    int i, x = 105, y = 56, w = 430, h = 44 + n * 30 + 70, pv, ry;
+    char buf[48];
+    background16(150);
+    panel16(x, y, w, h);
+    vgrad(x + 4, y + 4, w - 8, 28, C(76, 128, 240), C(38, 72, 178));
+    stext(x + 14, y + 10, 2, COL_WHITE, S16_SHADOW, title);
+    ry = y + 40;
+    for (i = 0; i < n; i++, ry += 30) {
+        const Item* it = &items[i];
+        int sl = (i == sel);
+        bar16(x + 10, ry, w - 20, 27, sl);
+        if (it->kind == K_ACTION) {
+            snprintf(buf, sizeof buf, "[ %s ]", it->name);
+            if (sl) text(x + (w - twidth(2, buf)) / 2, ry + 6, 2, S16_BROWN, buf);
+            else stext(x + (w - twidth(2, buf)) / 2, ry + 6, 2, S16_TEXT, S16_SHADOW, buf);
+            continue;
+        }
+        if (sl) text(x + 20, ry + 6, 2, S16_BROWN, it->name);
+        else stext(x + 20, ry + 6, 2, S16_TEXT, S16_SHADOW, it->name);
+        {
+            const char* v = it->opts[opt_index(it)].t;
+            int vx = x + w - 20 - 24 - twidth(2, v);
+            if (sl) text(vx, ry + 6, 2, S16_BROWN, v); else stext(vx, ry + 6, 2, S16_VALUE, S16_SHADOW, v);
+            if (sl) { arrow(vx - 16, ry + 13, -1, S16_BROWN); arrow(x + w - 20 - 12, ry + 13, 1, S16_BROWN); }
+        }
+    }
+    blend(x + 10, y + h - 62, w - 20, 52, COL_BLACK, 110);
+    fill(x + 10, y + h - 62, w - 20, 1, S16_EDGE2);
+    pv = items[sel].kind == K_CHOICE && items[sel].val == &g_cfg.mode;
+    wrap_text(x + 18, y + h - 55, (w - 36 - (pv ? 56 : 0)) / 8, 4, S16_TEXT, items[sel].help);
+    if (pv) preview(x + w - 10 - 52, y + h - 56, g_cfg.mode);
+    hint16("UP/DOWN choose  LEFT/RIGHT change  A select  B back  L1/R1 theme");
+}
+
 #define PANEL_X 125
 #define PANEL_W 430
 #define PANEL_Y 138
@@ -316,7 +450,8 @@ static void draw_sub_ti(const char* title, const Item* items, int n, int sel) {
 
 static void draw_main(int sel, const Item* items, int n) {
     int i;
-    if (g_cfg.look) { draw_main_ti(sel, items, n); return; }
+    if (g_cfg.look == 1) { draw_main_ti(sel, items, n); return; }
+    if (g_cfg.look == 2) { draw_main16(sel, items, n); return; }
     background();
     for (i = 0; i < n; i++) button(220, 144 + i * 48, 280, 40, items[i].name, i == sel);
     hint();
@@ -325,7 +460,8 @@ static void draw_main(int sel, const Item* items, int n) {
 static void draw_sub(const char* title, const Item* items, int n, int sel) {
     int i, h = 81 + ROW_H * n, x = PANEL_X, y = PANEL_Y, w = PANEL_W, ry, sy;
     char buf[48];
-    if (g_cfg.look) { draw_sub_ti(title, items, n, sel); return; }
+    if (g_cfg.look == 1) { draw_sub_ti(title, items, n, sel); return; }
+    if (g_cfg.look == 2) { draw_sub16(title, items, n, sel); return; }
     background();
     fill(x + 5, y + 5, w, h, COL_DROP);
     box3d(x, y, w, h, 0, COL_GRAY);
@@ -378,7 +514,9 @@ static unsigned poll_pressed(void) {
         else if ((held & m) && now >= g_next[i]) { pressed |= m; g_next[i] = now + 110; }
     }
     g_prev = b;
-    if (pressed & (SB_L1 | SB_R1)) g_cfg.look = !g_cfg.look;     /* theme: only here, never in the game */
+    /* theme: only here, never in the game. R1 = next, L1 = previous (Windows 3.x, TI-92, 16-bit) */
+    if (pressed & SB_R1) g_cfg.look = (g_cfg.look + 1) % 3;
+    if (pressed & SB_L1) g_cfg.look = (g_cfg.look + 2) % 3;
     if ((b & SB_START) && (b & SB_SELECT)) return 0x80000000u;   /* leave */
     return pressed;
 }
@@ -428,12 +566,23 @@ static void draw_howto(int page) {
     int x = HOW_X, y = HOW_Y, w = HOW_W;
     char pg[16];
     snprintf(pg, sizeof pg, "%d/%d", page + 1, HOW_PAGES);
-    if (g_cfg.look) {
+    if (g_cfg.look == 1) {
         const char* h = "LEFT/RIGHT page  B back";
         ti_frame(1, -1);
         howto_body(36, 62, SF_W - 72, page, TI3, TI3, TI2);
         text(SF_W / 2 - twidth(1, h) / 2, 398, 1, TI2, h);
         text(SF_W - 36 - twidth(1, pg), 398, 1, TI3, pg);
+        return;
+    }
+    if (g_cfg.look == 2) {
+        char t[32];
+        background16(150);
+        panel16(60, 52, 520, 376);
+        vgrad(64, 56, 512, 28, C(76, 128, 240), C(38, 72, 178));
+        snprintf(t, sizeof t, "How To Play  %s", pg);
+        stext(74, 62, 2, COL_WHITE, S16_SHADOW, t);
+        howto_body(84, 100, 472, page, S16_TEXT, S16_AMBER0, C(150, 170, 215));
+        hint16("LEFT/RIGHT page  B back  L1/R1 theme");
         return;
     }
     background();

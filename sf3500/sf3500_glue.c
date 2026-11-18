@@ -107,7 +107,7 @@ SDL_Renderer* sf3500_make_renderer(void) {
     sf3500_mode_info(g_cfg.mode, &vw, &vh, &scale, &ww, &wh);
     x0 = ((SF_W - ww) / 2) & ~1;      /* even: keeps 32-bit blits aligned */
     y0 = (SF_H - wh) / 2;
-    g_look = g_cfg.look;
+    g_look = (g_cfg.look == 1);
     g_vx = x0; g_vy = y0; g_vw = ww; g_vh = wh;
     if (g_look) build_look_lut();
     SDL_FillRect(g_surf, NULL, g_look ? LCD(26, 36, 38) : 0);

@@ -30,7 +30,7 @@ static void validate(void) {
     g_cfg.timing = g_cfg.timing != 0;
     g_cfg.yeti = clampi(g_cfg.yeti, 0, 2000);   /* the skier's y position is a 16-bit number: 2047 m is the end of the map */
     g_cfg.speed = clampi(g_cfg.speed, 25, 200);
-    g_cfg.look = g_cfg.look != 0;
+    g_cfg.look = clampi(g_cfg.look, 0, 2);
     g_cfg.nice = clampi(g_cfg.nice, -20, 19);
 }
 
@@ -116,7 +116,8 @@ int cfg_save(const char* path) {
         "# speed: game speed in percent (100 = original)\n"
         "speed=%d\n"
         "# look: the theme, switched with L1/R1 in the launcher menu. 0 = Windows 3.x menus and the original colours,\n"
-        "#        1 = TI-92 calculator menus and game (four LCD grays, colours only, the game is unchanged)\n"
+        "#        1 = TI-92 calculator menus and game (four LCD grays, colours only, the game is unchanged),\n"
+        "#        2 = 16-bit menus (the game keeps the original colours)\n"
         "look=%d\n"
         "# nice: process priority, -10 keeps the frames even\n"
         "nice=%d\n",
