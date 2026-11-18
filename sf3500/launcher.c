@@ -9,17 +9,22 @@
 #include <string.h>
 
 #define C(r, g, b) ((unsigned short)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3)))
+/* Windows 3.x look, to match the backdrop: gray bevelled dialogs, navy title bar, SkiFree yellow */
 #define COL_BG      C(226, 236, 248)
 #define COL_SNOW    C(250, 252, 255)
 #define COL_TITLE   C(18, 38, 108)
 #define COL_SHADOW  C(160, 178, 214)
-#define COL_TEXT    C(26, 46, 96)
-#define COL_SEL     C(32, 84, 176)
-#define COL_SELTXT  C(255, 255, 255)
-#define COL_DIM     C(96, 110, 146)
 #define COL_PINE    C(22, 94, 56)
 #define COL_PINE2   C(34, 124, 70)
 #define COL_TRUNK   C(104, 70, 40)
+#define COL_GRAY    C(192, 192, 192)
+#define COL_DGRAY   C(128, 128, 128)
+#define COL_WHITE   C(255, 255, 255)
+#define COL_BLACK   C(0, 0, 0)
+#define COL_NAVY    C(0, 0, 168)
+#define COL_YELLOW  C(250, 235, 20)
+#define COL_DROP    C(70, 70, 96)
+#define COL_HINT    C(0, 0, 120)
 
 typedef struct { int v; const char* t; } Opt;
 
@@ -40,14 +45,14 @@ static const Opt o_onoff[] = { { 1, "On" }, { 0, "Off" } };
 static const Opt o_volume[] = { { 0, "Mute" }, { 1, "1 of 10" }, { 2, "2 of 10" }, { 3, "3 of 10" }, { 4, "4 of 10" },
                                 { 5, "5 of 10" }, { 6, "6 of 10" }, { 7, "7 of 10" }, { 8, "8 of 10" },
                                 { 9, "9 of 10" }, { 10, "10 of 10" } };
-static const Opt o_set[] = { { 1, "Custom if found" }, { 0, "Built-in only" } };
+static const Opt o_set[] = { { 1, "Custom" }, { 0, "Built-in" } };
 static const Opt o_screen[] = { { 0, "640x480 full" }, { 1, "480x360 window" }, { 2, "320x240 window" },
                                 { 3, "2x full screen" }, { 4, "2x window" } };
 static const Opt o_fps[] = { { 20, "20 fps" }, { 30, "30 fps" }, { 40, "40 fps" }, { 60, "60 fps" } };
 static const Opt o_timing[] = { { 0, "Smooth" }, { 1, "Original" } };
-static const Opt o_yeti[] = { { 0, "Never" }, { 250, "After 250 m" }, { 500, "After 500 m" },
-                              { 1000, "After 1000 m" }, { 2000, "After 2000 m (orig)" } };
-static const Opt o_speed[] = { { 50, "50%" }, { 75, "75%" }, { 100, "100% (original)" }, { 125, "125%" }, { 150, "150%" } };
+static const Opt o_yeti[] = { { 0, "Never" }, { 250, "250 m" }, { 500, "500 m" },
+                              { 1000, "1000 m" }, { 2000, "2000 m (orig)" } };
+static const Opt o_speed[] = { { 50, "50%" }, { 75, "75%" }, { 100, "100% (orig)" }, { 125, "125%" }, { 150, "150%" } };
 
 #define N(a) ((int)(sizeof(a) / sizeof((a)[0])))
 
@@ -68,18 +73,16 @@ static Item av_items[] = {
     { K_CHOICE, "Screen", &g_cfg.mode, o_screen, N(o_screen), 0, g_help_screen },
     { K_CHOICE, "Frame rate", &g_cfg.fps, o_fps, N(o_fps), 0, "Frame rate cap. The game keeps its speed at any rate." },
     { K_ACTION, "Restore defaults", 0, 0, 0, A_RESET_AV, "Put the audio and video settings back." },
-    { K_ACTION, "Back", 0, 0, 0, A_BACK, "" },
 };
 
 static Item game_items[] = {
     { K_CHOICE, "Frame timing", &g_cfg.timing, o_timing, N(o_timing), 0,
       "Smooth moves the game every frame. Original steps it every 40 ms like Windows, a bit choppier." },
     { K_CHOICE, "Yeti", &g_cfg.yeti, o_yeti, N(o_yeti), 0,
-      "How far you ski before the yeti shows up. Never = practice mode." },
+      "How far you ski before the yeti shows up. Never = practice mode, no yeti at all." },
     { K_CHOICE, "Game speed", &g_cfg.speed, o_speed, N(o_speed), 0,
       "Slow the whole game down to practise, or speed it up." },
     { K_ACTION, "Restore defaults", 0, 0, 0, A_RESET_GAME, "Put the gameplay settings back." },
-    { K_ACTION, "Back", 0, 0, 0, A_BACK, "" },
 };
 
 static int opt_index(const Item* it) {
@@ -93,6 +96,14 @@ static int opt_index(const Item* it) {
 
 static unsigned short* g_px;
 static int g_stride;
+static SDL_Surface* g_bg;     /* launcher.bmp, 640x480 RGB565; NULL = drawn fallback */
+
+static void load_bg(void) {
+    SDL_Surface* raw = SDL_LoadBMP("launcher.bmp");
+    if (!raw) return;
+    if (raw->w == SF_W && raw->h == SF_H) g_bg = SDL_ConvertSurfaceFormat(raw, SDL_PIXELFORMAT_RGB565, 0);
+    SDL_FreeSurface(raw);
+}
 
 static void fill(int x, int y, int w, int h, unsigned short c) {
     int i, j;
@@ -110,6 +121,25 @@ static void text(int x, int y, int scale, unsigned short c, const char* s) {
 
 static int twidth(int scale, const char* s) { return (int)strlen(s) * 8 * scale; }
 
+/* Windows 3.x bevel: raised = white top-left, dark bottom-right; sunken the other way round */
+static void box3d(int x, int y, int w, int h, int sunken, unsigned short face) {
+    unsigned short hi = sunken ? COL_DGRAY : COL_WHITE, lo = sunken ? COL_WHITE : COL_DGRAY;
+    fill(x, y, w, h, COL_BLACK);
+    fill(x + 1, y + 1, w - 2, h - 2, face);
+    fill(x + 1, y + 1, w - 2, 2, hi);
+    fill(x + 1, y + 1, 2, h - 2, hi);
+    fill(x + 1, y + h - 3, w - 2, 2, lo);
+    fill(x + w - 3, y + 1, 2, h - 2, lo);
+}
+
+static void arrow(int x, int cy, int dir, unsigned short c) {   /* 6 wide triangle centered on cy */
+    int i;
+    for (i = 0; i < 6; i++) {
+        int half = dir < 0 ? i + 1 : 6 - i;
+        fill(x + i, cy - half, 1, half * 2, c);
+    }
+}
+
 static void tree(int cx, int base, int h) {
     int i, tw = h / 6 > 3 ? h / 6 : 3;
     fill(cx - tw / 2, base - h / 6, tw, h / 6, COL_TRUNK);
@@ -124,25 +154,40 @@ static void tree(int cx, int base, int h) {
     }
 }
 
-static void background(const char* subtitle) {
-    int x;
+static void background(void) {
+    int y, x;
+    if (g_bg) {
+        for (y = 0; y < SF_H; y++)
+            memcpy(g_px + y * g_stride, (unsigned char*)g_bg->pixels + y * g_bg->pitch, SF_W * 2);
+        return;
+    }
+    /* no launcher.bmp: plain snowy fallback */
     fill(0, 0, SF_W, SF_H, COL_BG);
-    /* a snowy drift across the bottom, rolling edge */
     for (x = 0; x < SF_W; x++) {
-        int top = 384 + (int)(9.0 * sin(x / 53.0) + 5.0 * sin(x / 19.0 + 1.0));
+        int top = 400 + (int)(9.0 * sin(x / 53.0) + 5.0 * sin(x / 19.0 + 1.0));
         fill(x, top, 1, SF_H - top, COL_SNOW);
     }
-    tree(34, 150, 60); tree(606, 150, 60);
-    tree(24, 470, 56); tree(616, 470, 56);
+    tree(34, 150, 60); tree(606, 150, 60); tree(24, 470, 56); tree(616, 470, 56);
     text(SF_W / 2 - twidth(4, "SkiFree") / 2 + 3, 25, 4, COL_SHADOW, "SkiFree");
     text(SF_W / 2 - twidth(4, "SkiFree") / 2, 22, 4, COL_TITLE, "SkiFree");
-    text(SF_W / 2 - twidth(2, subtitle) / 2, 82, 2, COL_DIM, subtitle);
 }
 
-static void wrap_text(int x, int y, int cols, int scale, unsigned short c, const char* s) {
-    char line[64];
+/* big raised button; the selected one is navy with yellow text */
+static void button(int x, int y, int w, int h, const char* label, int selected) {
+    int tx = x + (w - twidth(2, label)) / 2, ty = y + (h - 16) / 2;
+    box3d(x, y, w, h, 0, selected ? COL_NAVY : COL_GRAY);
+    if (selected) {
+        fill(x + 4, y + 4, w - 8, 1, COL_WHITE); fill(x + 4, y + h - 5, w - 8, 1, COL_WHITE);
+        fill(x + 4, y + 4, 1, h - 8, COL_WHITE); fill(x + w - 5, y + 4, 1, h - 8, COL_WHITE);
+    }
+    text(tx, ty, 2, selected ? COL_YELLOW : COL_BLACK, label);
+}
+
+static void wrap_text(int x, int y, int cols, int maxlines, unsigned short c, const char* s) {
+    char line[80];
     int lines = 0;
-    while (*s && lines < 3) {
+    if (cols > 78) cols = 78;
+    while (*s && lines < maxlines) {
         int n = (int)strlen(s), cut;
         if (n > cols) {
             cut = cols;
@@ -151,45 +196,76 @@ static void wrap_text(int x, int y, int cols, int scale, unsigned short c, const
         } else cut = n;
         memcpy(line, s, (size_t)cut);
         line[cut] = 0;
-        text(x, y + lines * 20 * scale / 2 * 1, scale, c, line);
+        text(x, y + lines * 11, 1, c, line);
         s += cut;
         while (*s == ' ') s++;
         lines++;
     }
 }
 
-/* little picture of the screen with the game's window in it */
+/* tiny picture of the screen with the game's window in it */
 static void preview(int x, int y, int mode) {
-    int vw, vh, sc, ww, wh;
+    int vw, vh, sc, ww, wh, pw = 44, ph = 33;
     sf3500_mode_info(mode, &vw, &vh, &sc, &ww, &wh);
-    fill(x - 3, y - 3, 102, 78, COL_TITLE);
-    fill(x, y, 96, 72, 0);
-    fill(x + (96 - ww * 96 / SF_W) / 2, y + (72 - wh * 72 / SF_H) / 2, ww * 96 / SF_W, wh * 72 / SF_H, COL_SNOW);
+    fill(x - 1, y - 1, pw + 2, ph + 2, COL_BLACK);
+    fill(x, y, pw, ph, COL_BLACK);
+    fill(x + (pw - ww * pw / SF_W) / 2, y + (ph - wh * ph / SF_H) / 2, ww * pw / SF_W, wh * ph / SF_H, COL_WHITE);
 }
 
-static void draw_menu(const char* subtitle, const Item* items, int n, int sel, int mode_preview) {
-    int i, y0 = 124;
+static void hint(void) {
+    const char* h = "UP/DOWN choose   LEFT/RIGHT change   A select   B back";
+    text(SF_W / 2 + 8 - twidth(1, h) / 2, 452, 1, COL_HINT, h);
+}
+
+#define PANEL_X 125
+#define PANEL_W 430
+#define PANEL_Y 138
+#define ROW_H 24
+
+static void draw_main(int sel, const Item* items, int n) {
+    int i;
+    background();
+    for (i = 0; i < n; i++) button(220, 148 + i * 56, 280, 44, items[i].name, i == sel);
+    hint();
+}
+
+static void draw_sub(const char* title, const Item* items, int n, int sel) {
+    int i, h = 81 + ROW_H * n, x = PANEL_X, y = PANEL_Y, w = PANEL_W, ry, sy;
     char buf[48];
-    background(subtitle);
-    for (i = 0; i < n; i++) {
+    background();
+    fill(x + 5, y + 5, w, h, COL_DROP);
+    box3d(x, y, w, h, 0, COL_GRAY);
+    fill(x + 3, y + 3, w - 6, 22, COL_NAVY);
+    text(x + 10, y + 6, 2, COL_WHITE, title);
+    ry = y + 33;
+    for (i = 0; i < n; i++, ry += ROW_H) {
         const Item* it = &items[i];
-        int y = y0 + i * 36;
-        unsigned short fg = COL_TEXT;
-        if (i == sel) { fill(60, y - 6, 520, 32, COL_SEL); fg = COL_SELTXT; }
-        text(80, y, 2, fg, it->name);
-        if (it->kind == K_CHOICE) {
+        int selr = (i == sel);
+        if (it->kind == K_ACTION) {
+            button(x + 8 + (w - 16 - 290) / 2, ry, 290, ROW_H - 2, it->name, selr);
+            continue;
+        }
+        if (selr) fill(x + 8, ry, w - 16, ROW_H - 2, COL_NAVY);
+        text(x + 14, ry + 3, 2, selr ? COL_WHITE : COL_BLACK, it->name);
+        {
             const char* v = it->opts[opt_index(it)].t;
-            if (i == sel) snprintf(buf, sizeof buf, "< %s >", v); else snprintf(buf, sizeof buf, "%s", v);
-            text(560 - twidth(2, buf), y, 2, fg, buf);
+            int fw = twidth(2, v) + 40, fx = x + w - 12 - fw;
+            snprintf(buf, sizeof buf, "%s", v);
+            box3d(fx, ry, fw, ROW_H - 2, 1, COL_WHITE);
+            arrow(fx + 7, ry + (ROW_H - 2) / 2, -1, selr ? COL_NAVY : C(170, 170, 170));
+            arrow(fx + fw - 13, ry + (ROW_H - 2) / 2, 1, selr ? COL_NAVY : C(170, 170, 170));
+            text(fx + 20, ry + 3, 2, COL_BLACK, buf);
         }
     }
-    if (items[sel].help[0]) {
-        int pv = mode_preview && items[sel].val == &g_cfg.mode;
-        wrap_text(60, 398, pv ? 26 : 33, 2, COL_TEXT, items[sel].help);
-        if (pv) preview(488, 387, g_cfg.mode);
+    /* status bar with the help line (and the screen preview on the Screen row) */
+    sy = y + h - 8 - 36;
+    box3d(x + 8, sy, w - 16, 36, 1, COL_GRAY);
+    {
+        int pv = items[sel].kind == K_CHOICE && items[sel].val == &g_cfg.mode;
+        wrap_text(x + 15, sy + 5, (w - 16 - 14 - (pv ? 56 : 0)) / 8, 3, COL_BLACK, items[sel].help);
+        if (pv) preview(x + w - 8 - 52, sy + 2, g_cfg.mode);
     }
-    text(SF_W / 2 - twidth(1, "UP/DOWN choose   LEFT/RIGHT change   A select   B back") / 2, 468, 1, COL_DIM,
-         "UP/DOWN choose   LEFT/RIGHT change   A select   B back");
+    hint();
 }
 
 /* ---- input ---- */
@@ -231,9 +307,9 @@ static void refresh_help(void) {
     int vw, vh, sc, ww, wh;
     char zs[16];
     if (n > 0)
-        snprintf(g_help_sound, sizeof g_help_sound, "%d custom sound%s found in sounds/custom.", n, n == 1 ? "" : "s");
+        snprintf(g_help_sound, sizeof g_help_sound, "%d custom sound%s found in sounds/custom. Built-in ignores them.", n, n == 1 ? "" : "s");
     else
-        snprintf(g_help_sound, sizeof g_help_sound, "No custom sounds found. Put .wav files in sounds/custom.");
+        snprintf(g_help_sound, sizeof g_help_sound, "No custom sounds found. Put .wav files in sounds/custom. Custom uses them, Built-in ignores them.");
     sf3500_mode_info(g_cfg.mode, &vw, &vh, &sc, &ww, &wh);
     if (sc > 1) snprintf(zs, sizeof zs, ", %dx zoom", sc); else zs[0] = 0;
     if (g_cfg.mode == 0)
@@ -246,14 +322,14 @@ static void refresh_help(void) {
 }
 
 /* One menu screen. Returns the action that ended it (A_BACK, A_PLAY, A_EXIT, ...). */
-static int run_menu(const char* subtitle, Item* items, int n, int mode_preview, int* selp) {
+static int run_menu(const char* subtitle, Item* items, int n, int is_main, int* selp) {
     int sel = *selp, dirty = 1;
     for (;;) {
         unsigned p;
         const Item* it;
         if (dirty) {
             refresh_help();
-            draw_menu(subtitle, items, n, sel, mode_preview);
+            if (is_main) draw_main(sel, items, n); else draw_sub(subtitle, items, n, sel);
             dirty = 0;
         }
         sf3500_present();
@@ -289,13 +365,14 @@ int launcher_run(const char* cfg_path) {
     SkiCfg start = g_cfg;
     int result = 0;
     g_px = sf3500_pixels(&g_stride);
+    load_bg();
     g_prev = 0xFFFFFFFFu;   /* ignore buttons already held when the menu opens */
     int msel = 0;
     for (;;) {
-        int sub = 0, a = run_menu("Choose an option", (Item*)main_items, N(main_items), 0, &msel);
+        int sub = 0, a = run_menu("", (Item*)main_items, N(main_items), 1, &msel);
         if (a == A_PLAY) { result = 1; break; }
         if (a == A_EXIT) { result = 0; break; }
-        if (a == A_AV) { if (run_menu("Audio / Video", av_items, N(av_items), 1, &sub) == A_EXIT) { result = 0; goto done; } }
+        if (a == A_AV) { if (run_menu("Audio / Video", av_items, N(av_items), 0, &sub) == A_EXIT) { result = 0; goto done; } }
         if (a == A_GAME) { if (run_menu("Gameplay", game_items, N(game_items), 0, &sub) == A_EXIT) { result = 0; goto done; } }
     }
 done:
