@@ -4,6 +4,7 @@
 #include "joykey.hpp"
 #include "config.h"
 #include "sfsound.h"
+#include "palette8.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -101,12 +102,51 @@ void sf3500_set_fps(int fps) {
     g_fps = fps < 5 ? 5 : (fps > 120 ? 120 : fps);
 }
 
+/* 8-bit theme: one fixed palette (palette8.h, generated with the sprites). Every pixel of the frame is snapped to
+ * its nearest entry through a 64K lookup (RGB565 -> RGB565), so art, ground, text and menus all agree. */
+/* 4096 entries (RGB444 bins, 8 KB: stays in the CPU cache). Every palette colour maps to itself. */
+static unsigned short g_pal_lut[4096];
+static int g_pal_ready;
+#define PAL_IDX(v) ((((v) >> 12) << 8) | ((((v) >> 7) & 15) << 4) | (((v) >> 1) & 15))
+
+static void build_pal_lut(void) {
+    int ri, gi, bi, k;
+    if (g_pal_ready) return;
+    for (ri = 0; ri < 16; ri++)
+        for (gi = 0; gi < 16; gi++)
+            for (bi = 0; bi < 16; bi++) {
+                int r = ((ri << 1) | 1) * 255 / 31, g = ((gi << 2) | 2) * 255 / 63, b = ((bi << 1) | 1) * 255 / 31;
+                int best = 0, bd = 1 << 30;
+                for (k = 0; k < PAL8_N; k++) {
+                    int dr = r - k_pal8[k][0], dg = g - k_pal8[k][1], db = b - k_pal8[k][2];
+                    int d = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+                    if (d < bd) { bd = d; best = k; }
+                }
+                g_pal_lut[(ri << 8) | (gi << 4) | bi] = (unsigned short)(((k_pal8[best][0] >> 3) << 11) | ((k_pal8[best][1] >> 2) << 5) | (k_pal8[best][2] >> 3));
+            }
+    g_pal_ready = 1;
+}
+
+unsigned short sf3500_pal8(unsigned short c) { build_pal_lut(); return g_pal_lut[PAL_IDX(c)]; }
+
+/* snaps a rectangle of the 640x480 screen to the palette */
+void sf3500_posterize(int x0, int y0, int w, int h) {
+    int y, x;
+    build_pal_lut();
+    for (y = y0; y < y0 + h && y < SF_H; y++) {
+        unsigned short* p = (unsigned short*)((unsigned char*)g_surf->pixels + y * g_surf->pitch) + x0;
+        for (x = 0; x < w && x0 + x < SF_W; x++) p[x] = g_pal_lut[PAL_IDX(p[x])];
+    }
+}
+
 /* 16-bit theme: a tiling snow texture (soft blue-white with a few drifts of darker flecks) under the sprites,
  * scrolled with the skier so it reads as ground. The tile is kept in the screen's own RGB565 format and
  * copied row by row straight into the view: it replaces the game's per-frame clear instead of adding to it
  * (drawing it as SDL textures cost ~30x the Windows theme's frame time). */
 #define SNOW_TILE 128
 static unsigned short* g_tile;     /* g_tile_n x g_tile_n, RGB565, each logical pixel repeated scale x scale */
+static int g_post;                 /* 8-bit theme: snap the status box corner to the palette (everything else is exact) */
+static int g_vscale = 1;
 static int g_tile_n;
 
 static unsigned snow_hash(unsigned x, unsigned y) {
@@ -115,7 +155,7 @@ static unsigned snow_hash(unsigned x, unsigned y) {
     return h ^ (h >> 16);
 }
 
-static void make_snow(int scale) {
+static void make_snow(int scale, int block) {   /* block: 1 = fine texture (16-bit), 2 = chunky 2x2 (8-bit) */
     int x, y, i, j;
     free(g_tile);
     g_tile_n = SNOW_TILE * scale;
@@ -123,13 +163,14 @@ static void make_snow(int scale) {
     if (!g_tile) return;
     for (y = 0; y < SNOW_TILE; y++)
         for (x = 0; x < SNOW_TILE; x++) {
-            unsigned h = snow_hash((unsigned)x, (unsigned)y);
+            unsigned h = snow_hash((unsigned)(x / block), (unsigned)(y / block));
             int r = 240, g = 246, b = 254;                       /* base: snow with a blue tint */
             unsigned short c;
             if (h % 61 == 0) { r = 214; g = 226; b = 248; }      /* small shadow flecks */
             else if (h % 97 == 0) { r = 252; g = 254; b = 255; } /* glints (never pure white: that is the sprites' key) */
             else if ((x / 2 + y / 2) % 2 && snow_hash((unsigned)(x / 8), (unsigned)(y / 8)) % 5 == 0) { r = 232; g = 240; b = 252; } /* faint dithered patches */
             c = (unsigned short)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+            if (block > 1) c = sf3500_pal8(c);                  /* 8-bit theme: the tile is palette-exact, no per-frame pass */
             for (j = 0; j < scale; j++)
                 for (i = 0; i < scale; i++) g_tile[(y * scale + j) * g_tile_n + x * scale + i] = c;
         }
@@ -138,7 +179,7 @@ static void make_snow(int scale) {
 /* Paints the whole view with the ground. Returns 0 when the theme is off (the caller clears as usual). */
 int sf3500_draw_ground(int scroll_x, int scroll_y) {
     int vw, vh, sc, ww, wh, ox, oy, y;
-    if (g_cfg.look != 2 || !g_tile || !g_view) return 0;
+    if (g_cfg.look < 2 || !g_tile || !g_view) return 0;
     sf3500_mode_info(g_cfg.mode, &vw, &vh, &sc, &ww, &wh);
     /* the world moves opposite to the skier: tile pixel (x - ox, y - oy) lands on screen pixel (x, y) */
     ox = (((scroll_x % SNOW_TILE) + SNOW_TILE) % SNOW_TILE) * sc;
@@ -164,6 +205,8 @@ SDL_Renderer* sf3500_make_renderer(void) {
     x0 = ((SF_W - ww) / 2) & ~1;      /* even: keeps 32-bit blits aligned */
     y0 = (SF_H - wh) / 2;
     g_look = (g_cfg.look == 1);
+    g_post = (g_cfg.look == 3);
+    g_vscale = scale;
     g_vx = x0; g_vy = y0; g_vw = ww; g_vh = wh;
     if (g_look) build_look_lut();
     SDL_FillRect(g_surf, NULL, g_look ? LCD(26, 36, 38) : 0);
@@ -172,7 +215,7 @@ SDL_Renderer* sf3500_make_renderer(void) {
     if (!g_view) return NULL;
     g_ren = SDL_CreateSoftwareRenderer(g_view);
     if (g_ren && scale > 1) SDL_RenderSetLogicalSize(g_ren, vw, vh);
-    if (g_cfg.look == 2) make_snow(scale);
+    if (g_cfg.look >= 2) make_snow(scale, g_cfg.look == 3 ? 2 : 1);
     fprintf(stderr, "sf3500: screen mode %d: view %dx%d, scale %d, window %dx%d at %d,%d\n", g_cfg.mode, vw, vh, scale, ww, wh, x0, y0);
     return g_ren;
 }
@@ -191,6 +234,12 @@ static void save_shot(void) {
 void sf3500_present(void) {
     unsigned now, target;
     if (g_look) apply_look();
+    if (g_post) {   /* art and ground are palette-exact; only the status box text still needs snapping */
+        int pw = 170 * g_vscale, ph = 60 * g_vscale;
+        if (pw > g_vw) pw = g_vw;
+        if (ph > g_vh) ph = g_vh;
+        sf3500_posterize(g_vx + g_vw - pw, g_vy, pw, ph);
+    }
     if (!g_headless)
         hwdisp_present(g_surf->pixels, SF_W, SF_H, g_surf->pitch);
     g_frame++;

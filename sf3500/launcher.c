@@ -314,6 +314,7 @@ static void draw_sub_ti(const char* title, const Item* items, int n, int sel) {
 /* ---- 16-bit theme: a code-drawn snow scene behind translucent navy panels with an amber selection bar ---- */
 
 static unsigned short* g_bg16;
+static unsigned short* g_bg8;      /* the scene as chunky 4x4 blocks in the 8-bit palette */
 
 static void blend(int x, int y, int w, int h, unsigned short c, int a) {   /* a: 0..256 */
     int cr = (c >> 11) & 31, cg = (c >> 5) & 63, cb = c & 31, i, j;
@@ -362,9 +363,17 @@ static void background16(int dim) {
         if (g_bg16) theme16_render(g_bg16, SF_W);
     }
     if (!g_bg16) { background(); return; }
+    if (g_cfg.look == 3 && !g_bg8) {
+        int x, y;
+        g_bg8 = (unsigned short*)malloc((size_t)SF_W * SF_H * 2);
+        if (g_bg8)
+            for (y = 0; y < SF_H; y++)
+                for (x = 0; x < SF_W; x++) g_bg8[y * SF_W + x] = sf3500_pal8(g_bg16[(y & ~3) * SF_W + (x & ~3)]);
+    }
     {
         int y;
-        for (y = 0; y < SF_H; y++) memcpy(g_px + y * g_stride, g_bg16 + y * SF_W, SF_W * 2);
+        const unsigned short* src = (g_cfg.look == 3 && g_bg8) ? g_bg8 : g_bg16;
+        for (y = 0; y < SF_H; y++) memcpy(g_px + y * g_stride, src + y * SF_W, SF_W * 2);
     }
     if (dim) blend(0, 0, SF_W, SF_H, C(12, 22, 64), dim);
 }
@@ -380,6 +389,7 @@ static void panel16(int x, int y, int w, int h) {
 static void hint16(const char* h) {
     blend(0, 446, SF_W, 34, COL_BLACK, 150);
     stext(SF_W / 2 - twidth(1, h) / 2, 458, 1, COL_WHITE, S16_SHADOW, h);
+    if (g_cfg.look == 3) sf3500_posterize(0, 0, SF_W, SF_H);   /* 8-bit theme: the finished screen snaps to the palette */
 }
 
 static void bar16(int x, int y, int w, int h, int selected) {
@@ -451,7 +461,7 @@ static void draw_sub16(const char* title, const Item* items, int n, int sel) {
 static void draw_main(int sel, const Item* items, int n) {
     int i;
     if (g_cfg.look == 1) { draw_main_ti(sel, items, n); return; }
-    if (g_cfg.look == 2) { draw_main16(sel, items, n); return; }
+    if (g_cfg.look >= 2) { draw_main16(sel, items, n); return; }
     background();
     for (i = 0; i < n; i++) button(220, 144 + i * 48, 280, 40, items[i].name, i == sel);
     hint();
@@ -461,7 +471,7 @@ static void draw_sub(const char* title, const Item* items, int n, int sel) {
     int i, h = 81 + ROW_H * n, x = PANEL_X, y = PANEL_Y, w = PANEL_W, ry, sy;
     char buf[48];
     if (g_cfg.look == 1) { draw_sub_ti(title, items, n, sel); return; }
-    if (g_cfg.look == 2) { draw_sub16(title, items, n, sel); return; }
+    if (g_cfg.look >= 2) { draw_sub16(title, items, n, sel); return; }
     background();
     fill(x + 5, y + 5, w, h, COL_DROP);
     box3d(x, y, w, h, 0, COL_GRAY);
@@ -514,9 +524,9 @@ static unsigned poll_pressed(void) {
         else if ((held & m) && now >= g_next[i]) { pressed |= m; g_next[i] = now + 110; }
     }
     g_prev = b;
-    /* theme: only here, never in the game. R1 = next, L1 = previous (Windows 3.x, TI-92, 16-bit) */
-    if (pressed & SB_R1) g_cfg.look = (g_cfg.look + 1) % 3;
-    if (pressed & SB_L1) g_cfg.look = (g_cfg.look + 2) % 3;
+    /* theme: only here, never in the game. R1 = next, L1 = previous (Windows 3.x, TI-92, 16-bit, 8-bit) */
+    if (pressed & SB_R1) g_cfg.look = (g_cfg.look + 1) % 4;
+    if (pressed & SB_L1) g_cfg.look = (g_cfg.look + 3) % 4;
     if ((b & SB_START) && (b & SB_SELECT)) return 0x80000000u;   /* leave */
     return pressed;
 }
@@ -574,7 +584,7 @@ static void draw_howto(int page) {
         text(SF_W - 36 - twidth(1, pg), 398, 1, TI3, pg);
         return;
     }
-    if (g_cfg.look == 2) {
+    if (g_cfg.look >= 2) {
         char t[32];
         background16(150);
         panel16(60, 52, 520, 376);
