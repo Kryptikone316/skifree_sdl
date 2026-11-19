@@ -59,8 +59,19 @@ static void ELL(int cx, int cy, int rx, int ry, ShadeFn f, void* u) {
 static const int bayer[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
 
 /* ---- sky and mountains ---- */
+static int g_variant;   /* 0 = the 16-bit look, 1 = the 8-bit look: bold flat bands, no dithering */
+
 static void sky(void) {
     int x, y;
+    if (g_variant) {   /* flat sky bands, like an 8-bit title screen */
+        static const unsigned short band[6] = { 0, 0, 0, 0, 0, 0 };
+        unsigned short bc[6];
+        (void)band;
+        bc[0] = rgb(36, 96, 236); bc[1] = rgb(56, 124, 248); bc[2] = rgb(92, 160, 252); bc[3] = rgb(140, 196, 254); bc[4] = rgb(190, 224, 254); bc[5] = rgb(226, 238, 252);
+        for (y = 0; y < LH; y++)
+            for (x = 0; x < LW; x++) { int b = y * 6 / 124; if (b > 5) b = 5; L[y][x] = bc[b]; }
+        return;
+    }
     for (y = 0; y < LH; y++)
         for (x = 0; x < LW; x++) {
             double t = y / 120.0;
@@ -245,14 +256,22 @@ static void skier(int cx, int fy) {
     LINE(cx - 7, fy - 54, cx - 12, fy - 48, hat, 2);
 }
 
-void theme16_render(unsigned short* dst, int stride_px) {
+void theme16_render(unsigned short* dst, int stride_px, int variant) {
     int x, y;
+    g_variant = variant;
     rng_state = 20261118u;
     sky();
-    mountain(70, 52, 70, 112, rgb(142, 166, 214), rgb(112, 138, 196), rgb(246, 250, 255), 14);
-    mountain(150, 40, 80, 112, rgb(130, 156, 208), rgb(100, 126, 188), rgb(250, 252, 255), 16);
-    mountain(236, 56, 64, 112, rgb(146, 170, 216), rgb(116, 142, 198), rgb(246, 250, 255), 12);
-    mountain(300, 48, 52, 112, rgb(134, 160, 210), rgb(104, 130, 190), rgb(250, 252, 255), 13);
+    if (variant) {   /* violet-blue ranges with flat faces */
+        mountain(70, 52, 70, 112, rgb(120, 110, 220), rgb(84, 70, 190), rgb(252, 252, 254), 14);
+        mountain(150, 40, 80, 112, rgb(104, 96, 210), rgb(68, 56, 176), rgb(252, 252, 254), 16);
+        mountain(236, 56, 64, 112, rgb(124, 114, 224), rgb(88, 74, 194), rgb(252, 252, 254), 12);
+        mountain(300, 48, 52, 112, rgb(110, 100, 214), rgb(74, 60, 182), rgb(252, 252, 254), 13);
+    } else {
+        mountain(70, 52, 70, 112, rgb(142, 166, 214), rgb(112, 138, 196), rgb(246, 250, 255), 14);
+        mountain(150, 40, 80, 112, rgb(130, 156, 208), rgb(100, 126, 188), rgb(250, 252, 255), 16);
+        mountain(236, 56, 64, 112, rgb(146, 170, 216), rgb(116, 142, 198), rgb(246, 250, 255), 12);
+        mountain(300, 48, 52, 112, rgb(134, 160, 210), rgb(104, 130, 190), rgb(250, 252, 255), 13);
+    }
     ground();
     lift();
     drift(90, 146, 12, 3);

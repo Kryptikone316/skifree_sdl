@@ -4,6 +4,6 @@
 #ifndef SF3500_THEME16_H
 #define SF3500_THEME16_H
 
-void theme16_render(unsigned short* dst, int stride_px);   /* dst: 640x480 RGB565 */
+void theme16_render(unsigned short* dst, int stride_px, int variant);   /* dst: 640x480 RGB565; variant 1 = the 8-bit look */
 
 #endif

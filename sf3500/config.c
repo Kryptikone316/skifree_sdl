@@ -115,7 +115,7 @@ int cfg_save(const char* path) {
         "yeti=%d\n"
         "# speed: game speed in percent (100 = original)\n"
         "speed=%d\n"
-        "# look: the theme, switched with L1/R1 in the launcher menu. 0 = Windows 3.x menus and the original colours,\n"
+        "# look: the theme, switched with L1/R1 in the launcher menu. 0 = Classic (Windows 3.x menus, original colours),\n"
         "#        1 = TI-92 calculator menus and game (four LCD grays, colours only, the game is unchanged),\n"
         "#        2 = 16-bit menus and game art, 3 = the same in 8-bit (half-resolution art, one fixed palette)\n"
         "look=%d\n"
