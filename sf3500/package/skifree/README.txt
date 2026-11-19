@@ -14,7 +14,7 @@ of the game:
 
   1. Get ski32.exe (version 1.04) from the official SkiFree site,
      https://ski.ihoc.net/
-  2. Put it in this folder, next to skifree.mipsel.
+  2. Put it in the gamedata folder: roms/ports/skifree/gamedata/ski32.exe
 
 If it is missing or the wrong version, the port tells you on screen.
 
@@ -27,7 +27,7 @@ THE LAUNCHER
   Gameplay         Frame timing, yeti distance, game speed.
   Exit             Back to the front-end.
 
-Your choices are saved in skifree.txt (plain lines, editable by hand).
+Your choices are saved in gamedata/skifree.txt (plain lines, editable by hand).
 
 L1 / R1 on the launcher menu change the theme:
   Classic, Modern (16-bit), Modern (8-bit) and TI-92.
@@ -39,14 +39,16 @@ SELECT + START while skiing returns to the launcher.
 
 EXTRAS (all optional)
 ---------------------
-  sounds/           The built-in sounds, made for this port.
-  sounds/custom/    Drop your own .wav files here to replace them. See the
-                    README in that folder.
-  sprites16/        Art for the Modern (16-bit) theme.
-  sprites8/         Art for the Modern (8-bit) theme.
+  gamedata/sounds/custom/   Drop your own .wav files here to replace the
+                            built-in sounds. See the README in that folder.
+  sounds/                   The built-in sounds, made for this port.
+  sprites16/                Art for the Modern (16-bit) theme.
+  sprites8/                 Art for the Modern (8-bit) theme.
 
-Anything missing from these folders falls back to the game's own art and the
-built-in sounds, so you can delete or replace files freely.
+Anything you leave out of sounds/, sprites16/ and sprites8/ falls back to the
+game's own art and the built-in sounds, so you can delete or replace files
+freely. Everything you add or the game saves (ski32.exe, skifree.txt, your own
+sounds) lives in gamedata/, away from the files the port ships.
 
 
 A WORD FROM THE MANAGEMENT

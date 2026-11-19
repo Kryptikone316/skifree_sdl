@@ -19,6 +19,13 @@ void cfg_defaults(void) {
     g_cfg.nice = -10;
 }
 
+char* cfg_asset_path(char* buf, unsigned n, const char* rel) {
+    const char* dir = getenv("SKI_ASSETS");
+    if (dir && *dir) snprintf(buf, n, "%s/%s", dir, rel);
+    else snprintf(buf, n, "%s", rel);
+    return buf;
+}
+
 static int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
 static void validate(void) {

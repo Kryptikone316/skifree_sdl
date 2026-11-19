@@ -107,8 +107,11 @@ int main(int argc, char* argv[]) {
     /* test hook: force the yeti start distance (metres) whatever the setting, to test "never" at a short course */
     if (getenv("SKI_TEST_YETI_M")) yetiStartY = (short)(atoi(getenv("SKI_TEST_YETI_M")) * 16);
     sfsnd_prepare();
-    if (g_cfg.look >= 2) peres_use_pack("sprites16");
-    if (g_cfg.look == 3) peres_use_pack("sprites8");   /* over the 16-bit art; sprites without an 8-bit version keep the 16-bit one */
+    {
+        char dir[320];
+        if (g_cfg.look >= 2) peres_use_pack(cfg_asset_path(dir, sizeof dir, "sprites16"));
+        if (g_cfg.look == 3) peres_use_pack(cfg_asset_path(dir, sizeof dir, "sprites8"));
+    }   /* over the 16-bit art; sprites without an 8-bit version keep the 16-bit one */
     fprintf(stderr, "settings: sound %d vol %d custom %d screen %d fps %d timing %d yeti %d speed %d\n", g_cfg.sound,
             g_cfg.volume, g_cfg.custom, g_cfg.mode, g_cfg.fps, g_cfg.timing, g_cfg.yeti, g_cfg.speed);
 #endif

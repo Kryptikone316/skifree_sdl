@@ -3,14 +3,14 @@
 #   - the binary from build_sf3500.sh (needs the MIPS toolchain, see that script)
 #   - the sprite packs and sounds, drawn and synthesised by sf3500/tools/ (Python 3 with Pillow, numpy, scipy)
 #   - the launcher backdrop converted to 640x480, the box art, and the files in sf3500/package/
-# ski32.exe is NOT included: players put their own copy in the skifree folder (see README.md).
+# ski32.exe is NOT included: players put their own copy in skifree/gamedata/ (see sf3500/package/skifree/README.txt).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=${PYTHON:-python3}
 OUT=${OUT:-dist}
 
 ./build_sf3500.sh
-mkdir -p "$OUT/skifree/sounds/custom" "$OUT/skifree/sprites16" "$OUT/skifree/sprites8"
+mkdir -p "$OUT/skifree/sounds" "$OUT/skifree/sprites16" "$OUT/skifree/sprites8"
 cp -r sf3500/package/. "$OUT/"
 cp build-sf3500/skifree.stripped.mipsel "$OUT/skifree/skifree.mipsel"
 cp sf3500/assets/boxart.png "$OUT/skifree/boxart.png"

@@ -102,7 +102,8 @@ static int g_stride;
 static SDL_Surface* g_bg;     /* launcher.bmp, 640x480 RGB565; NULL = drawn fallback */
 
 static void load_bg(void) {
-    SDL_Surface* raw = SDL_LoadBMP("launcher.bmp");
+    char bmp[320];
+    SDL_Surface* raw = SDL_LoadBMP(cfg_asset_path(bmp, sizeof bmp, "launcher.bmp"));
     if (!raw) return;
     if (raw->w == SF_W && raw->h == SF_H) g_bg = SDL_ConvertSurfaceFormat(raw, SDL_PIXELFORMAT_RGB565, 0);
     SDL_FreeSurface(raw);

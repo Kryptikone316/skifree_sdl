@@ -21,6 +21,11 @@ typedef struct {
 
 extern SkiCfg g_cfg;
 
+/* The port's shipped files (launcher.bmp, sounds/, sprites16/, sprites8/) live in $SKI_ASSETS (default: the current
+ * folder). What the player supplies or the game creates (ski32.exe, skifree.txt, sounds/custom/) stays in the current
+ * folder, which run.sh sets to gamedata/. Returns buf. */
+char* cfg_asset_path(char* buf, unsigned n, const char* rel);
+
 void cfg_defaults(void);
 void cfg_load(const char* path);   /* file, then SKI_* overrides */
 int cfg_save(const char* path);    /* 0 = ok */

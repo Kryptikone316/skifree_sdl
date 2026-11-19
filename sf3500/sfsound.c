@@ -140,7 +140,7 @@ static void load_all(void) {
             else if (rc != -1) fprintf(stderr, "sound: %s unreadable (%d), using the built-in sound\n", path, rc);
         }
         if (rc != 0) {
-            snprintf(path, sizeof path, "sounds/%s.wav", k_names[i]);
+            { char rel[64]; snprintf(rel, sizeof rel, "sounds/%s.wav", k_names[i]); cfg_asset_path(path, sizeof path, rel); }
             rc = load_wav(path, &pcm, &frames);
             if (rc != 0) { fprintf(stderr, "sound: %s missing or unreadable (%d)\n", path, rc); continue; }
         }

@@ -1,7 +1,7 @@
 Custom sounds for SkiFree (optional)
 ====================================
 
-Drop .wav files in this folder to replace the built-in sounds. Anything you
+Drop .wav files in this folder (roms/ports/skifree/gamedata/sounds/custom) to replace the built-in sounds. Anything you
 leave out keeps its built-in sound. In the launcher menu, Audio / Video >
 "Sound set" switches between "Custom if found" and "Built-in only", and
 "Sound: Off" turns every sound off, custom ones included.
