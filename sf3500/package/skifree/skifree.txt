@@ -1,0 +1,26 @@
+# SkiFree settings. The launcher menu writes this file; you can also edit it.
+# Plain name=number lines.
+#
+# sound: 1 = on, 0 = off (also ignores custom sounds)
+sound=1
+# volume: 0 (mute) to 10
+volume=8
+# custom_sounds: 1 = use files from sounds/custom/ where present, 0 = built-in sounds only
+custom_sounds=1
+# screen: 0 = 640x480 full, 1 = 480x360 window, 2 = 320x240 window,
+#         3 = 2x zoom full screen (320x240 view), 4 = 2x zoom 512x384 window (256x192 view)
+screen=0
+# fps: frame rate cap (the game keeps its speed whatever the frame rate)
+fps=40
+# timing: 0 = smooth (the game moves every frame), 1 = original (40 ms steps, like Windows)
+timing=1
+# yeti: metres before the yeti appears (2000 = original), 0 = no yeti
+yeti=2000
+# speed: game speed in percent (100 = original)
+speed=100
+# look: the theme, switched with L1/R1 in the launcher menu. 0 = Classic (Windows 3.x menus, original colours),
+#        1 = TI-92 calculator menus and game (four LCD grays, colours only, the game is unchanged),
+#        2 = 16-bit menus and game art, 3 = the same in 8-bit (half-resolution art, one fixed palette)
+look=0
+# nice: process priority, -10 keeps the frames even
+nice=-10
