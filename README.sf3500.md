@@ -37,15 +37,15 @@ roms/ports/skifree/
 │   ├── ski32.exe                 the game (supplied by the player)
 │   ├── skifree.txt               settings, written by the launcher
 │   └── sounds/custom/            the player's own replacement sounds
-├── sounds/                       optional module: the built-in sounds
-├── sprites16/                    optional module: Modern (16-bit) art
-└── sprites8/                     optional module: Modern (8-bit) art
+├── sounds/                       the built-in sounds (also a separate zip on the releases page)
+├── sprites16/                    Modern (16-bit) art (also a separate zip)
+└── sprites8/                     Modern (8-bit) art (also a separate zip)
 ```
 
 `run.sh` runs the program from `gamedata/` and sets `SKI_ASSETS` to the port folder, which is where the program finds
-`launcher.bmp`, `sounds/`, `sprites16/` and `sprites8/`. The three folders are optional modules, published as separate
-zips on the [releases page](https://github.com/Kryptikone316/skifree_sdl/releases) and unzipped into the port folder:
-without them the game still runs (silent, drawn with the game's own sprites).
+`launcher.bmp`, `sounds/`, `sprites16/` and `sprites8/`. The last three folders are included in the package and are also published as separate
+zips on the [releases page](https://github.com/Kryptikone316/skifree_sdl/releases), to unzip into the port folder for a
+smaller install or to put one back: without them the game still runs (silent, drawn with the game's own sprites).
 
 ## Building
 

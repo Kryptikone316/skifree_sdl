@@ -37,21 +37,22 @@ game itself looks when you press Play. L1 / R1 do nothing while skiing.
 SELECT + START while skiing returns to the launcher.
 
 
-OPTIONAL MODULES
-----------------
-Sound and the Modern themes' art are separate downloads, so the port itself stays small. Get them from
-https://github.com/Kryptikone316/skifree_sdl/releases and unzip them into this folder (roms/ports/skifree/):
+EXTRAS (all optional)
+---------------------
+  gamedata/sounds/custom/   Drop your own .wav files here to replace the
+                            built-in sounds. See the README in that folder.
+  sounds/                   The built-in sounds, made for this port.
+  sprites16/                Art for the Modern (16-bit) theme.
+  sprites8/                 Art for the Modern (8-bit) theme.
 
-  Sound module              sounds/      The nine built-in game sounds. Without it the game is silent.
-  Modern (16-bit) art       sprites16/   Sprites for the Modern (16-bit) theme.
-  Modern (8-bit) art        sprites8/    Sprites for the Modern (8-bit) theme (works on its own).
-  All modules               one zip with the three above.
+Anything you leave out of sounds/, sprites16/ and sprites8/ falls back to the
+game's own art and the built-in sounds, so you can delete or replace files
+freely. Each of the three is also a separate zip on the releases page,
+https://github.com/Kryptikone316/skifree_sdl/releases, for a smaller install
+or to put one back: unzip it into this folder.
 
-Without a module the game still works: the Modern themes keep their menus and snow ground but draw the
-game's own sprites. You can also drop your own .wav files in gamedata/sounds/custom/ (see the README there).
-
-Everything you add or the game saves (ski32.exe, skifree.txt, your own sounds) lives in gamedata/, away from
-the files the port ships.
+Everything you add or the game saves (ski32.exe, skifree.txt, your own
+sounds) lives in gamedata/, away from the files the port ships.
 
 
 A WORD FROM THE MANAGEMENT
