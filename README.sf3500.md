@@ -31,22 +31,27 @@ The commits on top of upstream are:
 ```text
 roms/ports/skifree/
 ├── skifree.mipsel, run.sh        the program and its launch script
-├── launcher.bmp, sounds/, sprites16/, sprites8/    the port's own files
-├── README.txt, licenses/       credits and the licence for the assets
-└── gamedata/                     what the player supplies or the game creates
-    ├── ski32.exe                 the game (supplied by the player)
-    ├── skifree.txt               settings, written by the launcher
-    └── sounds/custom/            the player's own replacement sounds
+├── launcher.bmp                  the Classic theme's backdrop
+├── README.txt, licenses/         credits and the licence for the assets
+├── gamedata/                     what the player supplies or the game creates
+│   ├── ski32.exe                 the game (supplied by the player)
+│   ├── skifree.txt               settings, written by the launcher
+│   └── sounds/custom/            the player's own replacement sounds
+├── sounds/                       optional module: the built-in sounds
+├── sprites16/                    optional module: Modern (16-bit) art
+└── sprites8/                     optional module: Modern (8-bit) art
 ```
 
 `run.sh` runs the program from `gamedata/` and sets `SKI_ASSETS` to the port folder, which is where the program finds
-`launcher.bmp`, `sounds/`, `sprites16/` and `sprites8/`.
+`launcher.bmp`, `sounds/`, `sprites16/` and `sprites8/`. The three folders are optional modules, published as separate
+zips on the [releases page](https://github.com/Kryptikone316/skifree_sdl/releases) and unzipped into the port folder:
+without them the game still runs (silent, drawn with the game's own sprites).
 
 ## Building
 
 ```sh
 ./build_sf3500.sh            # build-sf3500/skifree.stripped.mipsel
-sf3500/package.sh            # the SD-card package and a zip, in dist/
+sf3500/package.sh            # in dist/: the complete SD-card package, the core alone, and the module zips
 ```
 
 The toolchain is a MIPS32r2 little-endian GCC (tested with Codescape MIPS MTI GCC 6.3.0) whose sysroot has the SDL2
