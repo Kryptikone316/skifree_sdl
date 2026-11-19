@@ -10,8 +10,8 @@
 | Text font (`sf3500/ttfshim.c`) | Daniel Hepper, [font8x8](https://github.com/dhepper/font8x8) | Public domain. |
 | SF3500 display, audio, pad and mixer modules (`sf3500/hwdisp.*`, `hwaudio.*`, `joykey.*`, `sf3500_mixer.*`, `tfenv.h`) | glue code derived from TreeFrogUI's pico286 SF3000 patch | Used with the TreeFrogUI maintainer's permission to distribute it under GPL-compatible terms. It is shared with the other SF3500 ports. |
 | The rest of the SF3500 port code (`sf3500/`, the patches under `src/` marked `SF3500`, the scripts in `sf3500/tools/`) | this fork | No licence stated yet: the upstream projects state none, and nothing here changes that. |
-| Assets made for this port (listed below) | Kryptikone316 | MIT, see `sf3500/LICENSE-ASSETS` |
-| Box art (`sf3500/assets/boxart.png`) | Kryptikone316 | Not offered under the MIT terms: its label shows SkiFree's own logo and characters, which remain Chris Pirih's. Used as the launcher icon for this port. |
+| Assets made for this port (listed below) | the port author | MIT, see `sf3500/LICENSE-ASSETS` |
+| Box art (`sf3500/assets/boxart.png`) | the port author | Made for this port and used to identify the game. It shows SkiFree's own logo and characters, which remain Chris Pirih's. |
 
 ## Assets made for this port (MIT)
 
@@ -20,6 +20,7 @@
 - the built-in sounds, `sounds/` (synthesised by `sf3500/tools/make_sounds.py`)
 - the launcher artwork: the Classic backdrop (`sf3500/assets/launcher-backdrop.png`), the 16-bit and 8-bit launcher scene
   (drawn in `sf3500/theme16.c`) and the TI-92 and 16-bit menu looks
+- the box art, `sf3500/assets/boxart.png` (the game's own logo and characters in it stay Chris Pirih's)
 
 The ChatGPT concept images that guided the Modern themes' style were reference only; none of their pixels are used.
 
