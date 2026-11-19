@@ -124,6 +124,11 @@ static void text(int x, int y, int scale, unsigned short c, const char* s) {
 
 static int twidth(int scale, const char* s) { return (int)strlen(s) * 8 * scale; }
 
+/* text with a glyph cell of any pixel size (the How To Play pages use 15 px) */
+static void textpx(int x, int y, int px, unsigned short c, const char* s) {
+    ttfshim_draw565_px(g_px, g_stride, SF_W, SF_H, x, y, px, c, s);
+}
+
 /* Windows 3.x bevel: raised = white top-left, dark bottom-right; sunken the other way round */
 static void box3d(int x, int y, int w, int h, int sunken, unsigned short face) {
     unsigned short hi = sunken ? COL_DGRAY : COL_WHITE, lo = sunken ? COL_WHITE : COL_DGRAY;
@@ -639,47 +644,66 @@ static const char* const k_controls[][2] = {
     { "SELECT+START", "back to menu" },
 };
 
-#define HOW_LINE 22   /* a line of 16 px text */
+#define HOW_PX 15     /* How To Play text size in pixels */
+#define HOW_LINE 20   /* a line of it */
+#define HOW_ROW 18    /* a row of the button table */
 
 /* One paragraph: wraps at `cols`, returns the y below it. */
 static int how_par(int x, int y, int cols, unsigned short c, const char* s) {
-    return y + HOW_LINE * wrap_scaled(x, y, cols, 6, 2, c, s) + 6;
+    char line[80];
+    int lines = 0;
+    if (cols > 78) cols = 78;
+    while (*s && lines < 8) {
+        int n = (int)strlen(s), cut;
+        if (n > cols) {
+            cut = cols;
+            while (cut > 0 && s[cut] != ' ') cut--;
+            if (cut == 0) cut = cols;
+        } else cut = n;
+        memcpy(line, s, (size_t)cut);
+        line[cut] = 0;
+        textpx(x, y + lines * HOW_LINE, HOW_PX, c, line);
+        s += cut;
+        while (*s == ' ') s++;
+        lines++;
+    }
+    return y + lines * HOW_LINE + 6;
 }
 
 /* the text of a page, drawn from (x, ty), w wide, in the given colours; text is 16 px high like the menus */
 static void howto_body(int x, int ty, int w, int page, unsigned short ct, unsigned short ck, unsigned short cd) {
-    int i, cols = w / 16;
+    int i, cols = w / HOW_PX;
     char buf[96];
     (void)cd;
     switch (page) {
     case 0:
-        text(x, ty, 2, ck, "The Basics"); ty += 28;
+        textpx(x, ty, HOW_PX, ck, "The Basics"); ty += 26;
         ty = how_par(x, ty, cols, ct, "Ski down the mountain and stay on your feet. Trees and rocks knock you over.");
         ty = how_par(x, ty, cols, ct, "Jump off bumps and ramps, and do tricks in the air for style points.");
         break;
     case 1:
-        text(x, ty, 2, ck, "Courses"); ty += 28;
+        textpx(x, ty, HOW_PX, ck, "Courses"); ty += 26;
         ty = how_par(x, ty, cols, ct, "Ski through a sign at the start to pick one.");
         ty = how_par(x, ty, cols, ct, "Slalom: a timed race through the gates. A missed gate adds 5 seconds.");
         ty = how_par(x, ty, cols, ct, "Tree Slalom: a longer timed race.");
         break;
     case 2:
-        text(x, ty, 2, ck, "Freestyle"); ty += 28;
+        textpx(x, ty, HOW_PX, ck, "Freestyle"); ty += 26;
         ty = how_par(x, ty, cols, ct, "No finish line. Score style points with jumps and tricks.");
         ty = how_par(x, ty, cols, ct, "You get back up on your own after a fall.");
         break;
     case 3:
-        text(x, ty, 2, ck, "The Yeti"); ty += 28;
+        textpx(x, ty, HOW_PX, ck, "The Yeti"); ty += 26;
         if (g_cfg.yeti > 0) snprintf(buf, sizeof buf, "After %d m the yeti comes after you.", g_cfg.yeti);
         else snprintf(buf, sizeof buf, "The yeti is switched off, so nobody is chasing you.");
         ty = how_par(x, ty, cols, ct, buf);
         if (g_cfg.yeti > 0) ty = how_par(x, ty, cols, ct, "If he catches you, press B to start again.");
         break;
     default:
-        text(x, ty, 2, ck, "Buttons"); ty += 26;
-        for (i = 0; i < (int)(sizeof k_controls / sizeof k_controls[0]); i++, ty += 20) {
-            text(x, ty, 2, ck, k_controls[i][0]);
-            text(x + 208, ty, 2, ct, k_controls[i][1]);
+        textpx(x, ty, HOW_PX, ck, "Buttons"); ty += 24;
+        for (i = 0; i < (int)(sizeof k_controls / sizeof k_controls[0]); i++, ty += HOW_ROW) {
+            textpx(x, ty, HOW_PX, ck, k_controls[i][0]);
+            textpx(x + 196, ty, HOW_PX, ct, k_controls[i][1]);
         }
         break;
     }

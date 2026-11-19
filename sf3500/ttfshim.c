@@ -197,6 +197,28 @@ SDL_Surface* TTF_RenderUTF8_Blended_Wrapped(TTF_Font* font, const char* text, SD
     return s;
 }
 
+/* Like ttfshim_draw565 but the glyph cell is `size` pixels square (any size, nearest-neighbour from the 8x8 font):
+ * 15 px, say, where scale 2 would be 16. Each character advances `size` pixels. */
+void ttfshim_draw565_px(unsigned short* px, int stride, int w, int h, int x, int y, int size,
+                        unsigned short color, const char* text) {
+    const unsigned char* p;
+    int x0 = x;
+    for (p = (const unsigned char*)text; *p; p++) {
+        if (*p == '\n') { x = x0; y += size + 2; continue; }
+        if (*p < 128) {
+            int oy, ox;
+            for (oy = 0; oy < size; oy++) {
+                unsigned char row = font8x8_basic[*p][oy * 8 / size];
+                for (ox = 0; ox < size; ox++) {
+                    int dx = x + ox, dy = y + oy;
+                    if ((row & (1 << (ox * 8 / size))) && dx >= 0 && dx < w && dy >= 0 && dy < h) px[dy * stride + dx] = color;
+                }
+            }
+        }
+        x += size;
+    }
+}
+
 void ttfshim_draw565(unsigned short* px, int stride, int w, int h, int x, int y, int scale,
                      unsigned short color, const char* text) {
     const unsigned char* p;
