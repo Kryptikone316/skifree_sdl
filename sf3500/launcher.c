@@ -186,7 +186,7 @@ static void button(int x, int y, int w, int h, const char* label, int selected) 
     text(tx, ty, 2, selected ? COL_YELLOW : COL_BLACK, label);
 }
 
-static int wrap_text(int x, int y, int cols, int maxlines, unsigned short c, const char* s) {
+static int wrap_scaled(int x, int y, int cols, int maxlines, int scale, unsigned short c, const char* s) {
     char line[80];
     int lines = 0;
     if (cols > 78) cols = 78;
@@ -199,12 +199,16 @@ static int wrap_text(int x, int y, int cols, int maxlines, unsigned short c, con
         } else cut = n;
         memcpy(line, s, (size_t)cut);
         line[cut] = 0;
-        text(x, y + lines * 11, 1, c, line);
+        text(x, y + lines * (scale * 10 + (scale == 1 ? 1 : 0) + (scale > 1 ? 2 : 0)), scale, c, line);
         s += cut;
         while (*s == ' ') s++;
         lines++;
     }
     return lines;
+}
+
+static int wrap_text(int x, int y, int cols, int maxlines, unsigned short c, const char* s) {
+    return wrap_scaled(x, y, cols, maxlines, 1, c, s);
 }
 
 /* tiny picture of the screen with the game's window in it */
@@ -617,42 +621,67 @@ static unsigned poll_pressed(void) {
 
 /* ---- how to play ---- */
 
-#define HOW_PAGES 2
-#define HOW_X 116
-#define HOW_W 446
-#define HOW_Y 134
-#define HOW_H 228
+#define HOW_PAGES 5
+#define HOW_X 70
+#define HOW_W 500
+#define HOW_Y 118
+#define HOW_H 256
 
 static const char* const k_controls[][2] = {
     { "LEFT/RIGHT", "turn" },
-    { "DOWN", "straight downhill" },
-    { "UP", "shuffle uphill when stopped" },
-    { "Y / A", "steer down-left / down-right" },
-    { "B or R1", "jump; again in the air = tricks" },
+    { "DOWN", "straight down" },
+    { "UP", "shuffle uphill" },
+    { "Y / A", "diagonal turns" },
+    { "B or R1", "jump, tricks" },
     { "X", "small hop" },
     { "SELECT", "pause" },
     { "START", "new game" },
-    { "SELECT+START", "back to this menu" },
+    { "SELECT+START", "back to menu" },
 };
 
-/* the text of a page, drawn from (x, ty), w wide, in the given colours */
+#define HOW_LINE 22   /* a line of 16 px text */
+
+/* One paragraph: wraps at `cols`, returns the y below it. */
+static int how_par(int x, int y, int cols, unsigned short c, const char* s) {
+    return y + HOW_LINE * wrap_scaled(x, y, cols, 6, 2, c, s) + 6;
+}
+
+/* the text of a page, drawn from (x, ty), w wide, in the given colours; text is 16 px high like the menus */
 static void howto_body(int x, int ty, int w, int page, unsigned short ct, unsigned short ck, unsigned short cd) {
-    int i, cols = (w - 8) / 8;
-    if (page == 0) {
-        ty += 12 * wrap_text(x, ty, cols, 3, ct, "Ski down the mountain and stay on your feet. Trees and rocks knock you over.") + 4;
-        ty += 12 * wrap_text(x, ty, cols, 2, ct, "Jump off bumps and ramps, and do tricks in the air for style points.") + 6;
-        text(x, ty, 1, ck, "Pick a course by skiing through a sign at the start:");
-        ty += 14;
-        ty += 12 * wrap_text(x + 8, ty, cols - 2, 2, ct, "Slalom: a timed race through the gates. A missed gate adds 5 seconds.");
-        ty += 12 * wrap_text(x + 8, ty, cols - 2, 2, ct, "Tree Slalom: a longer timed race.");
-        ty += 12 * wrap_text(x + 8, ty, cols - 2, 2, ct, "Freestyle: no finish line. Score style points with jumps and tricks.") + 6;
-        wrap_text(x, ty, cols, 3, ct, "After 2000 m the yeti comes after you. If he catches you, press B to start again.");
-    } else {
-        for (i = 0; i < (int)(sizeof k_controls / sizeof k_controls[0]); i++, ty += 15) {
-            text(x, ty, 1, ck, k_controls[i][0]);
-            text(x + 104, ty, 1, ct, k_controls[i][1]);
+    int i, cols = w / 16;
+    char buf[96];
+    (void)cd;
+    switch (page) {
+    case 0:
+        text(x, ty, 2, ck, "The Basics"); ty += 28;
+        ty = how_par(x, ty, cols, ct, "Ski down the mountain and stay on your feet. Trees and rocks knock you over.");
+        ty = how_par(x, ty, cols, ct, "Jump off bumps and ramps, and do tricks in the air for style points.");
+        break;
+    case 1:
+        text(x, ty, 2, ck, "Courses"); ty += 28;
+        ty = how_par(x, ty, cols, ct, "Ski through a sign at the start to pick one.");
+        ty = how_par(x, ty, cols, ct, "Slalom: a timed race through the gates. A missed gate adds 5 seconds.");
+        ty = how_par(x, ty, cols, ct, "Tree Slalom: a longer timed race.");
+        break;
+    case 2:
+        text(x, ty, 2, ck, "Freestyle"); ty += 28;
+        ty = how_par(x, ty, cols, ct, "No finish line. Score style points with jumps and tricks.");
+        ty = how_par(x, ty, cols, ct, "You get back up on your own after a fall.");
+        break;
+    case 3:
+        text(x, ty, 2, ck, "The Yeti"); ty += 28;
+        if (g_cfg.yeti > 0) snprintf(buf, sizeof buf, "After %d m the yeti comes after you.", g_cfg.yeti);
+        else snprintf(buf, sizeof buf, "The yeti is switched off, so nobody is chasing you.");
+        ty = how_par(x, ty, cols, ct, buf);
+        if (g_cfg.yeti > 0) ty = how_par(x, ty, cols, ct, "If he catches you, press B to start again.");
+        break;
+    default:
+        text(x, ty, 2, ck, "Buttons"); ty += 26;
+        for (i = 0; i < (int)(sizeof k_controls / sizeof k_controls[0]); i++, ty += 20) {
+            text(x, ty, 2, ck, k_controls[i][0]);
+            text(x + 208, ty, 2, ct, k_controls[i][1]);
         }
-        wrap_text(x, ty + 3, cols, 2, cd, "You get back up on your own after a fall.");
+        break;
     }
 }
 
@@ -687,7 +716,7 @@ static void draw_howto(int page) {
     text(x + 10, y + 6, 2, COL_WHITE, "How To Play");
     text(x + w - 10 - twidth(2, pg), y + 6, 2, COL_YELLOW, pg);
     box3d(x + 8, y + 31, w - 16, HOW_H - 31 - 8, 1, COL_WHITE);
-    howto_body(x + 16, y + 38, w - 32, page, COL_BLACK, COL_NAVY, COL_DGRAY);
+    howto_body(x + 18, y + 40, w - 36, page, COL_BLACK, COL_NAVY, COL_DGRAY);
     {
         hint("LEFT/RIGHT or A  next page   B back   L1/R1 theme");
     }
