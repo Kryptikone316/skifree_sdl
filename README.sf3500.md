@@ -32,7 +32,7 @@ The commits on top of upstream are:
 roms/ports/skifree/
 ├── skifree.mipsel, run.sh        the program and its launch script
 ├── launcher.bmp, sounds/, sprites16/, sprites8/    the port's own files
-├── README.txt, LICENSE-ASSETS.txt
+├── README.txt, licenses/       credits and the licence for the assets
 └── gamedata/                     what the player supplies or the game creates
     ├── ski32.exe                 the game (supplied by the player)
     ├── skifree.txt               settings, written by the launcher

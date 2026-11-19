@@ -96,7 +96,7 @@ CREDITS
 The artwork in the Modern themes and the built-in sounds were drawn and
 synthesised for this port. The Classic theme's launcher backdrop is original
 artwork made for it as well. These assets are released under the MIT license (see
-LICENSE-ASSETS.txt in this folder). The box art is by the port author and is used only
+licenses/LICENSE-ASSETS.txt). The box art is by the port author and is used only
 to identify the game; it shows SkiFree's own logo and characters.
 
 A special mention goes to Michael Holt (psigoo), http://calc.psigoo.com, whose
