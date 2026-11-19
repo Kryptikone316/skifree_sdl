@@ -216,8 +216,19 @@ static void preview(int x, int y, int mode) {
     fill(x + (pw - ww * pw / SF_W) / 2, y + (ph - wh * ph / SF_H) / 2, ww * pw / SF_W, wh * ph / SF_H, COL_WHITE);
 }
 
-static void hint(void) {
-    const char* h = "UP/DOWN choose  LEFT/RIGHT change  A select  B back  L1/R1 theme";
+/* The footer lists only what works on the current screen. Main menu: UP/DOWN (LEFT/RIGHT too in the TI-92 theme,
+ * where the entries are tabs) and A. A row with a value: LEFT/RIGHT change it. A button row: A. */
+static const char* footer_text(int is_main, const Item* it, int with_theme) {
+    if (is_main) {
+        if (g_cfg.look == 1) return with_theme ? "UP/DOWN or LEFT/RIGHT choose  A select  L1/R1 theme" : "UP/DOWN or LEFT/RIGHT choose  A select";
+        return with_theme ? "UP/DOWN choose  A select  L1/R1 theme" : "UP/DOWN choose  A select";
+    }
+    if (it && it->kind == K_CHOICE)
+        return with_theme ? "UP/DOWN choose  LEFT/RIGHT change value  B back  L1/R1 theme" : "UP/DOWN choose  LEFT/RIGHT change value  B back";
+    return with_theme ? "UP/DOWN choose  A select  B back  L1/R1 theme" : "UP/DOWN choose  A select  B back";
+}
+
+static void hint(const char* h) {
     text(SF_W / 2 + 8 - twidth(1, h) / 2, 452, 1, COL_HINT, h);
 }
 
@@ -258,8 +269,7 @@ static void ti_frame(int active, int cursor) {
     text(502, 453, 1, TI2, "L1/R1");
 }
 
-static void ti_hint(void) {
-    const char* h = "UP/DOWN choose  LEFT/RIGHT change  A select  B back";
+static void ti_hint(const char* h) {
     text(SF_W / 2 - twidth(1, h) / 2, 398, 1, TI2, h);
 }
 
@@ -276,7 +286,7 @@ static void draw_main_ti(int sel, const Item* items, int n) {
         if (i == sel) fill(150, y - 4, SF_W - 300, 30, TI3);
         text(SF_W / 2 - twidth(2, items[i].name) / 2, y + 2, 2, i == sel ? TI0 : TI3, items[i].name);
     }
-    ti_hint();
+    ti_hint(footer_text(1, 0, 0));
     wrap_text(22, 431, 57, 3, TI3, items[sel].help);
 }
 
@@ -305,7 +315,7 @@ static void draw_sub_ti(const char* title, const Item* items, int n, int sel) {
             }
         }
     }
-    ti_hint();
+    ti_hint(footer_text(0, &items[sel], 0));
     pv = items[sel].kind == K_CHOICE && items[sel].val == &g_cfg.mode;
     wrap_text(22, 431, pv ? 50 : 57, 3, TI3, items[sel].help);
     if (pv) preview(436, 428, g_cfg.mode);
@@ -415,7 +425,7 @@ static void draw_main16(int sel, const Item* items, int n) {
         if (sl) text(x + (w - twidth(2, items[i].name)) / 2, by + 8, 2, S16_BROWN, items[i].name);
         else stext(x + (w - twidth(2, items[i].name)) / 2, by + 8, 2, COL_WHITE, S16_SHADOW, items[i].name);
     }
-    hint16("UP/DOWN choose  LEFT/RIGHT change  A select  B back  L1/R1 theme");
+    hint16(footer_text(1, 0, 1));
 }
 
 static void draw_sub16(const char* title, const Item* items, int n, int sel) {
@@ -450,7 +460,7 @@ static void draw_sub16(const char* title, const Item* items, int n, int sel) {
     pv = items[sel].kind == K_CHOICE && items[sel].val == &g_cfg.mode;
     wrap_text(x + 18, y + h - 55, (w - 36 - (pv ? 56 : 0)) / 8, 4, S16_TEXT, items[sel].help);
     if (pv) preview(x + w - 10 - 52, y + h - 56, g_cfg.mode);
-    hint16("UP/DOWN choose  LEFT/RIGHT change  A select  B back  L1/R1 theme");
+    hint16(footer_text(0, &items[sel], 1));
 }
 
 #define PANEL_X 125
@@ -464,7 +474,7 @@ static void draw_main(int sel, const Item* items, int n) {
     if (g_cfg.look >= 2) { draw_main16(sel, items, n); return; }
     background();
     for (i = 0; i < n; i++) button(220, 144 + i * 48, 280, 40, items[i].name, i == sel);
-    hint();
+    hint(footer_text(1, 0, 1));
 }
 
 static void draw_sub(const char* title, const Item* items, int n, int sel) {
@@ -505,7 +515,7 @@ static void draw_sub(const char* title, const Item* items, int n, int sel) {
         wrap_text(x + 15, sy + 5, (w - 16 - 14 - (pv ? 56 : 0)) / 8, 3, COL_BLACK, items[sel].help);
         if (pv) preview(x + w - 8 - 52, sy + 2, g_cfg.mode);
     }
-    hint();
+    hint(footer_text(0, &items[sel], 1));
 }
 
 /* ---- input ---- */
@@ -577,7 +587,7 @@ static void draw_howto(int page) {
     char pg[16];
     snprintf(pg, sizeof pg, "%d/%d", page + 1, HOW_PAGES);
     if (g_cfg.look == 1) {
-        const char* h = "LEFT/RIGHT page  B back";
+        const char* h = "LEFT/RIGHT or A  next page  B back";
         ti_frame(1, -1);
         howto_body(36, 62, SF_W - 72, page, TI3, TI3, TI2);
         text(SF_W / 2 - twidth(1, h) / 2, 398, 1, TI2, h);
@@ -592,7 +602,7 @@ static void draw_howto(int page) {
         snprintf(t, sizeof t, "How To Play  %s", pg);
         stext(74, 62, 2, COL_WHITE, S16_SHADOW, t);
         howto_body(84, 100, 472, page, S16_TEXT, S16_AMBER0, C(150, 170, 215));
-        hint16("LEFT/RIGHT page  B back  L1/R1 theme");
+        hint16("LEFT/RIGHT or A  next page  B back  L1/R1 theme");
         return;
     }
     background();
@@ -604,8 +614,7 @@ static void draw_howto(int page) {
     box3d(x + 8, y + 31, w - 16, HOW_H - 31 - 8, 1, COL_WHITE);
     howto_body(x + 16, y + 38, w - 32, page, COL_BLACK, COL_NAVY, COL_DGRAY);
     {
-        const char* h = "LEFT/RIGHT page    B back    L1/R1 theme";
-        text(SF_W / 2 + 8 - twidth(1, h) / 2, 452, 1, COL_HINT, h);
+        hint("LEFT/RIGHT or A  next page   B back   L1/R1 theme");
     }
 }
 
@@ -677,6 +686,10 @@ static int run_menu(const char* subtitle, Item* items, int n, int is_main, int* 
         it = &items[sel];
         if (p & SB_UP) sel = (sel + n - 1) % n;
         if (p & SB_DOWN) sel = (sel + 1) % n;
+        if (is_main && g_cfg.look == 1) {   /* the entries are tabs in the TI-92 theme: LEFT/RIGHT walk along them */
+            if (p & SB_LEFT) sel = (sel + n - 1) % n;
+            if (p & SB_RIGHT) sel = (sel + 1) % n;
+        }
         *selp = sel;
         it = &items[sel];
         if (it->kind == K_CHOICE && (p & (SB_LEFT | SB_RIGHT))) {
